@@ -1,0 +1,47 @@
+@startuml
+title ElderSafe_Gateway - High Level Architecture
+
+' Actors / External systems
+actor "Accelerometer Node" as Accel
+actor "Central Server" as Server
+node "MQTT Broker" as Broker
+
+component "ElderSafe Gateway\n(main.py)" as Gateway {
+  [MQTTHandler] as MQTT
+  [Logic Controller] as Logic
+  [Env Loop] as EnvLoop
+  [VisionSystem] as Vision
+  [HardwareManager] as Hardware
+}
+
+' Message flows
+Accel -> Broker : publish \n`elder/sensor/motion`\n{"g_value": <float>, "device_id": "...", "ts": ...}
+Broker -> MQTT : deliver message
+MQTT -> Logic : on_message(topic, payload)
+Logic -> Vision : analyze_scene()
+Vision --> Logic : {"fall_detected":"0|1","emotions":"...","confidence":0.0}
+alt fall verified
+  Logic -> MQTT : publish `elder/sensor/cam`\n{device_id, fall_detected, confidence, ts}
+  Logic -> Hardware : trigger_emergency()
+  Hardware -> MQTT : publish `sensor/env`\n{event:"fall", ts}
+end
+
+EnvLoop -> Hardware : read_env()
+EnvLoop -> MQTT : publish `sensor/env`\n{temp, humidity, smoke, ts}
+
+MQTT -> Broker : publish topics
+Broker -> Server : forward publishes (central server subscribed)
+
+note right of MQTT
+  - Uses `paho-mqtt`\n  - Should add TLS, LWT, reconnect/backoff
+end note
+
+note left of Hardware
+  - Safe mock mode when not on Raspberry Pi\n  - Controls buzzer & servo, reads DHT (if available)
+end note
+
+note bottom
+  Message schema recommendations:\n  - Include `device_id`, `ts`, `seq`, and `confidence` where applicable\n  - Use numeric types for sensors; use schema versioning
+end note
+
+@enduml

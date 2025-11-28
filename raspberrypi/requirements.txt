@@ -1,0 +1,6 @@
+paho-mqtt
+opencv-python
+influxdb-client
+adafruit-circuitpython-dht
+RPi.GPIO
+gpiozero
