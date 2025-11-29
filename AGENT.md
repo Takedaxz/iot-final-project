@@ -44,7 +44,7 @@ This document provides a comprehensive technical overview of the ElderSafe AI pr
 
 **Key Logic**:
 - Subscribes to `elder/sensor/motion` and `elder/sensor/cam`.
-- On high G-force (>2.5), triggers vision analysis.
+- On high G-force (>2), triggers vision analysis.
 - On confirmed fall, activates emergency protocol (buzzer + servo).
 - Runs environmental monitoring loop in background.
 
@@ -57,7 +57,7 @@ This document provides a comprehensive technical overview of the ElderSafe AI pr
 **Settings**:
 - MQTT broker: localhost:1883
 - GPIO pins: Buzzer(21), Servo(22), DHT(15), Smoke(17)
-- Thresholds: G_FORCE_LIMIT = 2.5
+- Thresholds: G_FORCE_LIMIT = 2
 - Intervals: ENV_INTERVAL = 5 seconds
 
 #### Modules

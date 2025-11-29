@@ -123,5 +123,4 @@ ElderSafe AI is a hybrid elder safety monitoring system that integrates a "Smart
 4. Run: `python3 raspberrypi/main.py`
 
 ## Note
-This project is still under development. Some features like full InfluxDB integration and advanced AI models are not yet implemented.</content>
-<parameter name="filePath">c:\Users\Patta\OneDrive\Documents\PlatformIO\Projects\IoT-final\README.md
+This project is still under development. Some features like full InfluxDB integration and advanced AI models are not yet implemented.
