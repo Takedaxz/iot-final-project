@@ -3,16 +3,25 @@ import time
 import random
 
 try:
-    import RPi.GPIO as GPIO
-    ON_PI = True
+    from gpiozero import Buzzer, Servo, Button
+    HAVE_GPIOZERO = True
 except Exception:
-    ON_PI = False
+    HAVE_GPIOZERO = False
+
+try:
+    import adafruit_ads1x15.ads1115 as ADS
+    import busio
+    HAVE_ADC = True
+except Exception:
+    HAVE_ADC = False
 
 try:
     import adafruit_dht
     HAVE_DHT = True
-except Exception:
+    print("[DEBUG] adafruit_dht imported successfully")
+except Exception as e:
     HAVE_DHT = False
+    print(f"[DEBUG] adafruit_dht import failed: {e}")
 
 try:
     import board
@@ -20,50 +29,32 @@ try:
 except Exception:
     HAVE_BOARD = False
 
-try:
-    from gpiozero import ADS1115
-    HAVE_ADC = True
-except Exception:
-    HAVE_ADC = False
-
 
 class HardwareManager:
     def __init__(self, cfg):
         self.cfg = cfg
         self._buzzer_on = False
-        # Initialize GPIO if available. Some RPi.GPIO installs raise runtime
-        # errors (e.g. when missing peripheral access). Handle gracefully and
-        # fall back to mock mode.
+        # Initialize GPIO devices if available
         self._gpio_ready = False
-        if ON_PI:
+        self.buzzer = None
+        self.servo = None
+        self.smoke_sensor = None
+        if HAVE_GPIOZERO:
             try:
-                GPIO.setmode(GPIO.BCM)
-                GPIO.setup(self.cfg.PIN_BUZZER, GPIO.OUT)
-                GPIO.setup(self.cfg.PIN_SERVO, GPIO.OUT)
-                self.servo = GPIO.PWM(self.cfg.PIN_SERVO, 50)
-                self.servo.start(0)
+                # self.buzzer = Buzzer(self.cfg.PIN_BUZZER)
+                # self.servo = Servo(self.cfg.PIN_SERVO)
+                self.smoke_sensor = Button(self.cfg.PIN_SMOKE, pull_up=True)
                 self._gpio_ready = True
             except Exception as e:
-                # Could be RuntimeError: Cannot determine SOC peripheral base address
                 print(f"[HARDWARE] GPIO init failed, falling back to mock mode: {e}")
                 self._gpio_ready = False
         else:
-            print("[HARDWARE] Running in mock mode (not a Raspberry Pi).")
+            print("[HARDWARE] gpiozero not available, using mock mode.")
 
         # DHT device will be created lazily to avoid runtime errors on non-Pi
         self._dht = None
 
-        # ADC for analog sensors
-        self._adc_smoke = None
-        if HAVE_ADC and ON_PI:
-            try:
-                smoke_channel = getattr(self.cfg, 'SMOKE_ADC_CHANNEL', 0)
-                self._adc_smoke = ADS1115(channel=smoke_channel)
-            except Exception as e:
-                print(f"[HARDWARE] ADC init failed, falling back to mock smoke: {e}")
-                self._adc_smoke = None
-        else:
-            print("[HARDWARE] ADS1115 not available, using mock smoke sensor.")
+        # No ADC needed for digital smoke
 
     def _init_dht(self):
         if HAVE_DHT and self._dht is None:
@@ -76,8 +67,11 @@ class HardwareManager:
                 else:
                     pin_obj = pin
 
-                self._dht = adafruit_dht.DHT22(pin_obj)
-            except Exception:
+                # print(f"[DEBUG] Initializing DHT on pin {pin} (board.{board_attr})")
+                self._dht = adafruit_dht.DHT11(pin_obj)
+                # print("[DEBUG] DHT initialized successfully")
+            except Exception as e:
+                print(f"[DEBUG] DHT init failed: {e}")
                 self._dht = None
 
     def trigger_emergency(self):
@@ -86,11 +80,11 @@ class HardwareManager:
         self._buzzer_on = True
         if self._gpio_ready:
             try:
-                GPIO.output(self.cfg.PIN_BUZZER, GPIO.HIGH)
-                # Move servo to ~90 degrees (approx duty cycle 7.5)
-                self.servo.ChangeDutyCycle(7.5)
-                time.sleep(1)
-                self.servo.ChangeDutyCycle(0)
+                # self.buzzer.on()
+                # self.servo.max()
+                # time.sleep(1)
+                # self.servo.detach()
+                pass  # Actuators not connected yet
             except Exception as e:
                 print(f"[HARDWARE] trigger_emergency GPIO error: {e}")
         else:
@@ -103,15 +97,16 @@ class HardwareManager:
         self._buzzer_on = False
         if self._gpio_ready:
             try:
-                GPIO.output(self.cfg.PIN_BUZZER, GPIO.LOW)
-                self.servo.ChangeDutyCycle(2.5)
-                time.sleep(1)
-                self.servo.ChangeDutyCycle(0)
+                # self.buzzer.off()
+                # self.servo.min()
+                # time.sleep(1)
+                # self.servo.detach()
+                pass  # Actuators not connected yet
             except Exception as e:
                 print(f"[HARDWARE] reset_emergency GPIO error: {e}")
 
     def read_env(self):
-        """Read environment sensors: DHT and mock smoke. Returns a dict."""
+        """Read environment sensors: DHT and smoke via digital input. Returns a dict."""
         # DHT
         temp = None
         hum = None
@@ -121,19 +116,20 @@ class HardwareManager:
                 try:
                     temp = self._dht.temperature
                     hum = self._dht.humidity
-                except Exception:
+                    # print(f"[DEBUG] DHT read: temp={temp}, hum={hum}")
+                except Exception as e:
+                    print(f"[DEBUG] DHT read failed: {e}")
                     temp = None
                     hum = None
 
-        # Smoke sensor: read from ADC if available, else mock
-        if self._adc_smoke is not None:
+        # Smoke sensor: read from digital input if available, else mock
+        if self.smoke_sensor is not None:
             try:
-                # MCP3008 returns 0-1, scale to 0-1023 like Arduino ADC
-                smoke_level = int(self._adc_smoke.value * 1023)
+                smoke_level = 1 if self.smoke_sensor.is_pressed else 0  # 1 if smoke detected
             except Exception:
-                smoke_level = random.randint(0, 200)
+                smoke_level = random.randint(0, 1)
         else:
-            smoke_level = random.randint(0, 200)
+            smoke_level = random.randint(0, 1)
 
         return {"temp": (round(temp, 1) if temp is not None else "N/A"),
                 "humidity": (round(hum, 1) if hum is not None else "N/A"),

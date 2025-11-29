@@ -1,11 +1,12 @@
 # config.py
-
+#source .venv/bin/activate
 # MQTT Settings
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 TOPIC_MOTION = "elder/sensor/motion"
-TOPIC_CAM = "elder/sensor/cam"
-TOPIC_ENV = "elder/sensor/env"
+TOPIC_CAM = "elder/gateway/cam"
+TOPIC_ENV = "elder/gateway/env"
+TOPIC_CLOUD_MOTION = "elder/cloud/motion"
 
 # GPIO Pins (BCM)
 PIN_BUZZER = 21
@@ -18,6 +19,7 @@ SMOKE_ADC_CHANNEL = 0  # ADS1115 channel for smoke sensor (AO pin)
 
 # Thresholds
 G_FORCE_LIMIT = 2
+MIC_THRESHOLD = 150
 
 # Environment publish interval (seconds)
 ENV_INTERVAL = 5

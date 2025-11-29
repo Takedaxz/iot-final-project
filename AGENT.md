@@ -14,7 +14,7 @@ This document provides a comprehensive technical overview of the ElderSafe AI pr
 
 ### Communication Flow
 - ESP32 → MQTT Broker → Raspberry Pi (motion data)
-- Raspberry Pi → MQTT Broker → Central Server (processed data)
+- Raspberry Pi → MQTT Broker → Central Server (processed data, env data, forwarded motion)
 - Raspberry Pi ↔ Hardware (GPIO control for actuators)
 
 ## Codebase Analysis
@@ -56,17 +56,18 @@ This document provides a comprehensive technical overview of the ElderSafe AI pr
 #### Configuration (`config.py`)
 **Settings**:
 - MQTT broker: localhost:1883
-- GPIO pins: Buzzer(21), Servo(22), DHT(15), Smoke(17)
+- GPIO pins: Buzzer(21), Servo(22), DHT(27), Smoke(17)
 - Thresholds: G_FORCE_LIMIT = 2
 - Intervals: ENV_INTERVAL = 5 seconds
+- Topics: motion="elder/sensor/motion", cam="elder/gateway/cam", env="elder/gateway/env", cloud_motion="elder/cloud/motion"
 
 #### Modules
 
 ##### `hardware_ctrl.py` - Hardware Manager
 **Features**:
 - GPIO control for buzzer and servo.
-- DHT22 temperature/humidity sensor reading.
-- Mock smoke sensor (random values).
+- DHT11 temperature/humidity sensor reading.
+- Smoke sensor (digital): 1 if detected, 0 otherwise.
 - Graceful fallback to mock mode when not on Raspberry Pi.
 
 **Safety Features**:
@@ -105,67 +106,91 @@ This document provides a comprehensive technical overview of the ElderSafe AI pr
 - adafruit-circuitpython-dht: Temperature sensor
 - RPi.GPIO, gpiozero: Hardware control
 
-## Current State & Gaps
+## Current System Status (Updated 2025-11-29)
 
-### Implemented Features
-- ✅ ESP32 sensor reading and MQTT publishing
-- ✅ Raspberry Pi MQTT subscription and basic logic
-- ✅ Hardware control with mock fallbacks
-- ✅ Basic vision heuristics
-- ✅ Environmental sensor reading
+### Implemented Features ✅
+- ✅ ESP32 sensor reading and MQTT publishing (`elder/sensor/motion`)
+- ✅ Raspberry Pi MQTT subscription, processing, and forwarding (`elder/cloud/motion`)
+- ✅ Vision AI heuristics for fall detection (basic face detection)
+- ✅ Hardware control: DHT11 temp/humidity, digital smoke sensor
+- ✅ Environmental monitoring and publishing (`elder/gateway/env`)
+- ✅ Emergency protocol (buzzer/servo actuators, commented for testing)
+- ✅ **Web streaming with live Pi Camera feed and emotion detection** (dashboard at http://<pi-ip>:5000)
+- ✅ MQTT-based pub/sub architecture for real-time communication
 
-### Missing/Incomplete Features
-- ❌ InfluxDB integration (client installed but not used)
-- ❌ Real emotion detection model (currently random)
-- ❌ Advanced fall detection (pose estimation)
-- ❌ Grafana visualization setup
-- ❌ TLS/encryption for MQTT
-- ❌ LWT (Last Will and Testament) for connection monitoring
-- ❌ Battery optimization for ESP32
-- ❌ Error handling and logging improvements
-- ❌ Configuration management (hardcoded values)
-- ❌ Testing framework
+### Current Architecture
+- **ESP32 (Edge)**: Publishes motion/sound data to `elder/sensor/motion`
+- **Raspberry Pi (Gateway)**:
+  - Subscribes to `elder/sensor/motion`, forwards to `elder/cloud/motion`
+  - Processes high G-force events, triggers vision analysis
+  - Publishes vision results to `elder/gateway/cam`
+  - Publishes env data to `elder/gateway/env` every 5 seconds
+  - **Runs web stream at http://<pi-ip>:5000** with live camera, MediaPipe AI, and dashboard
+- **Topics**:
+  - `elder/sensor/motion`: Raw motion from ESP32
+  - `elder/cloud/motion`: Forwarded motion for cloud
+  - `elder/gateway/cam`: Vision/fall detection results
+  - `elder/gateway/env`: Temp, humidity, smoke data
+- **Hardware**: DHT11 (GPIO 15), MQ smoke DO (GPIO 17), actuators ready
 
 ### Known Issues
-- Vision system uses basic heuristics, not robust AI.
-- No data persistence beyond MQTT.
-- GPIO errors on some Raspberry Pi setups.
-- No reconnection logic for MQTT broker failures.
-- Environmental loop runs indefinitely without error recovery.
+- Actuators (buzzer/servo) commented out for testing
+- Vision uses basic heuristics, not robust AI
+- No data persistence or cloud integration yet
+- GPIO errors possible on some Pi setups
 
-## Development Recommendations
+## Development Roadmap
 
-### Immediate Priorities
-1. **Implement Real AI Models**:
-   - Replace mock emotion detection with DeepFace or TensorFlow Lite.
-   - Add pose estimation for better fall detection.
+### Immediate Next Steps (Priority 1-3)
+1. **InfluxDB Integration**:
+   - Set up InfluxDB Docker container
+   - Configure MQTT subscription to `elder/cloud/#` topics
+   - Store motion, env, and vision data as time-series
 
-2. **Database Integration**:
-   - Set up InfluxDB Docker container.
-   - Implement data insertion from MQTT messages.
-   - Add Grafana dashboard configuration.
+2. **Grafana Dashboard**:
+   - Connect Grafana to InfluxDB
+   - Create dashboard for real-time monitoring (temp, smoke, motion charts)
+   - Add alerts for smoke detection and high G-force
 
-3. **Robustness Improvements**:
-   - Add MQTT reconnection with exponential backoff.
-   - Implement proper error logging.
-   - Add health checks and monitoring.
+3. **Enhanced Vision AI**:
+   - Replace mock emotion detection with DeepFace or TensorFlow Lite
+   - Implement pose estimation for better fall detection
+   - Add temporal tracking for motion analysis
 
-4. **Security**:
-   - Add MQTT TLS encryption.
-   - Secure WiFi credentials (environment variables).
-   - Implement authentication.
+### Medium-Term Improvements (Priority 4-6)
+4. **Security & Reliability**:
+   - Add MQTT TLS encryption
+   - Implement LWT for device monitoring
+   - Add reconnection logic with exponential backoff
 
-### Testing Strategy
-- Unit tests for individual modules.
-- Integration tests for MQTT communication.
-- Hardware simulation for GPIO testing.
-- Mock sensors for development environment.
+5. **Actuator Integration**:
+   - Uncomment and test buzzer/servo GPIO code
+   - Add timeout and reset logic for emergency responses
+
+6. **Testing & CI/CD**:
+   - Unit tests for modules (hardware, vision, MQTT)
+   - Integration tests for end-to-end MQTT flow
+   - GitHub Actions for automated testing
+
+### Long-Term Enhancements (Priority 7+)
+7. **ESP32 Optimizations**:
+   - Battery management and sleep modes
+   - Over-the-air updates
+
+8. **Cloud Deployment**:
+   - Docker containerization for Pi services
+   - Cloud MQTT broker (e.g., AWS IoT, HiveMQ)
+   - REST API for external integrations
+
+9. **Advanced Features**:
+   - Multi-camera support
+   - Machine learning model training on collected data
+   - Mobile app for caregiver notifications
 
 ### Deployment Considerations
-- Docker container for Raspberry Pi services.
-- PlatformIO for ESP32 firmware management.
-- Environment-specific configurations.
-- Automated setup scripts.
+- Docker for InfluxDB/Grafana on Pi or separate server
+- Environment-specific configs (dev/prod)
+- Automated setup scripts for new deployments
 
 ## File Structure Reference
 

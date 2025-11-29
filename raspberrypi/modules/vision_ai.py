@@ -1,7 +1,7 @@
 """Simple Vision system with graceful fallback when OpenCV isn't available.
 
 This module exposes `VisionSystem.analyze_scene()` which captures one frame
-and returns a dict: {"fall_detected": "0|1", "emotions": "happy|sad|neutral"}
+and returns a dict: {"fall_detected": "0|1"}
 In environments without camera/opencv, it returns mocked results.
 """
 import random
@@ -14,8 +14,9 @@ except Exception:
 
 
 class VisionSystem:
-    def __init__(self, camera_index=0):
+    def __init__(self, camera_index=0, picam2=None):
         self.camera_index = camera_index
+        self.picam2 = picam2  # Use Pi Camera if provided
         if HAVE_CV:
             # attempt to load cascade for face detection if possible
             try:
@@ -26,20 +27,31 @@ class VisionSystem:
             print("[VISION] OpenCV not available; using mock vision outputs.")
 
     def analyze_scene(self):
-        """Capture an image and run quick heuristics for fall verification and emotion.
+        """Capture an image and run quick heuristics for fall verification.
 
-        Returns a dict e.g. {"fall_detected":"1","emotions":"sad"}
+        Returns a dict e.g. {"fall_detected":"1"}
         """
         if HAVE_CV:
-            cam = cv2.VideoCapture(self.camera_index)
-            ret, frame = cam.read()
-            cam.release()
-            if not ret or frame is None:
-                return None
+            if self.picam2:
+                # Use Pi Camera
+                try:
+                    frame_raw = self.picam2.capture_array()
+                    if frame_raw.shape[2] == 4:
+                        frame = cv2.cvtColor(frame_raw, cv2.COLOR_BGRA2BGR)
+                    else:
+                        frame = frame_raw.copy()
+                except Exception:
+                    return None
+            else:
+                # Fallback to USB camera
+                cam = cv2.VideoCapture(self.camera_index)
+                ret, frame = cam.read()
+                cam.release()
+                if not ret or frame is None:
+                    return None
 
             # Basic heuristic: if face found and bounding box aspect ratio suggests lying
             fall_flag = False
-            emotion = "neutral"
 
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             faces = []
@@ -59,13 +71,7 @@ class VisionSystem:
                 if ratio > 1.2:  # wider than tall -> possibly lying
                     fall_flag = True
 
-            # Emotion: placeholder random choice (replace with model in real project)
-            emotions_list = ["happy", "sad", "neutral"]
-            emotion = random.choice(emotions_list)
-
-            return {"fall_detected": "1" if fall_flag else "0",
-                    "emotions": emotion}
+            return {"fall_detected": "1" if fall_flag else "0"}
 
         # Fallback mocked result
-        emotions_list = ["happy", "sad", "neutral"]
-        return {"fall_detected": random.choice(["0", "1"]), "emotions": random.choice(emotions_list)}
+        return {"fall_detected": random.choice(["0", "1"])}

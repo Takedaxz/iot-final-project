@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ElderSafe Camera Stream</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f0f0f0; }
+        h1 { color: #333; }
+        .container { display: flex; flex-wrap: wrap; }
+        .video-container { flex: 1; min-width: 640px; }
+        .status-container { flex: 1; min-width: 300px; margin-left: 20px; }
+        .status { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 10px; }
+        .status h3 { margin-top: 0; color: #555; }
+        .alert { color: red; font-weight: bold; }
+        .ok { color: green; }
+        img { max-width: 100%; border: 2px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>ElderSafe Live Camera Stream</h1>
+    <div class="container">
+        <div class="video-container">
+            <h2>Live Feed</h2>
+            <img src="{{ url_for('video_feed') }}" alt="Live Camera Feed">
+        </div>
+        <div class="status-container">
+            <div class="status">
+                <h3>Environment Status</h3>
+                <p>Temperature: <span id="temp">{{ temp }}°C</span></p>
+                <p>Humidity: <span id="hum">{{ hum }}%</span></p>
+                <p>Smoke: <span id="smoke">Loading...</span></p>
+            </div>
+            <div class="status">
+                <h3>Motion & Fall Detection</h3>
+                <p>G-Force: <span id="gforce">Loading...</span></p>
+                <p>Fall Status: <span id="fall">Loading...</span></p>
+                <p>Expression: <span id="expression">Loading...</span></p>
+            </div>
+            <div class="status">
+                <h3>Alerts</h3>
+                <p id="alert">Loading...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateStatus() {
+            fetch('/env_status_api')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('temp').textContent = data.temperature;
+                    document.getElementById('hum').textContent = data.humidity;
+                    document.getElementById('smoke').textContent = data.smoke_status;
+                    document.getElementById('gforce').textContent = data.g_force_latest;
+                    document.getElementById('fall').textContent = data.fall_status;
+                    document.getElementById('expression').textContent = data.expression;
+                    document.getElementById('alert').textContent = data.critical_alert;
+
+                    // Style alerts
+                    const alertEl = document.getElementById('alert');
+                    if (data.critical_alert.includes('FALL') || data.smoke_status.includes('DETECTED')) {
+                        alertEl.className = 'alert';
+                    } else {
+                        alertEl.className = 'ok';
+                    }
+                })
+                .catch(error => console.error('Error fetching status:', error));
+        }
+
+        // Update every 2 seconds
+        setInterval(updateStatus, 2000);
+        updateStatus(); // Initial load
+    </script>
+</body>
+</html>
