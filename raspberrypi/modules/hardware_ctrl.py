@@ -41,8 +41,8 @@ class HardwareManager:
         self.smoke_sensor = None
         if HAVE_GPIOZERO:
             try:
-                # self.buzzer = Buzzer(self.cfg.PIN_BUZZER)
-                # self.servo = Servo(self.cfg.PIN_SERVO)
+                self.buzzer = Buzzer(self.cfg.PIN_BUZZER)
+                self.servo = Servo(self.cfg.PIN_SERVO)
                 self.smoke_sensor = Button(self.cfg.PIN_SMOKE, pull_up=True)
                 self._gpio_ready = True
             except Exception as e:
@@ -80,11 +80,10 @@ class HardwareManager:
         self._buzzer_on = True
         if self._gpio_ready:
             try:
-                # self.buzzer.on()
-                # self.servo.max()
-                # time.sleep(1)
-                # self.servo.detach()
-                pass  # Actuators not connected yet
+                self.buzzer.on()
+                self.servo.max()
+                time.sleep(1)
+                self.servo.detach()
             except Exception as e:
                 print(f"[HARDWARE] trigger_emergency GPIO error: {e}")
         else:
@@ -97,11 +96,10 @@ class HardwareManager:
         self._buzzer_on = False
         if self._gpio_ready:
             try:
-                # self.buzzer.off()
-                # self.servo.min()
-                # time.sleep(1)
-                # self.servo.detach()
-                pass  # Actuators not connected yet
+                self.buzzer.off()
+                self.servo.min()
+                time.sleep(1)
+                self.servo.detach()
             except Exception as e:
                 print(f"[HARDWARE] reset_emergency GPIO error: {e}")
 

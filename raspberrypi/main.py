@@ -140,32 +140,28 @@ def on_mqtt_message(client, userdata, msg):
         influx_client.write_points(json_body)
 
         if g_val > config.G_FORCE_LIMIT:
-            print('[LOGIC] High impact -> trigger vision verification')
-            ai_result = vision.analyze_scene()
-            print(f"[VISION] Cam analysis result: {ai_result}")
-            if ai_result and ai_result.get('fall_detected') == '1':
-                payload = {"fall_detected": "1", "emotions": global_expression}
-                mqtt.publish(config.TOPIC_CAM, payload)
-                print(f"[FALL] Published confirmed fall: {payload}")
-                global_critical_alert = "FALL DETECTED"
+            print('[LOGIC] High impact -> triggering emergency protocol')
+            # run emergency in separate thread so env loop continues
+            threading.Thread(target=handle_emergency, args=(mqtt,)).start()
+            global_critical_alert = "FALL DETECTED"
 
-                # Write fall to InfluxDB
-                json_body = [
-                    {
-                        "measurement": "camera",
-                        "tags": {
-                            "sensor": "picam"
-                        },
-                        "fields": {
-                            "fall_detected": 1,
-                            "emotion": global_expression
-                        },
-                        "time": int(time.time() * 1e9)
-                    }
-                ]
-                influx_client.write_points(json_body)
-            else:
-                global_critical_alert = "ALERT_OK"
+            # Write fall to InfluxDB
+            json_body = [
+                {
+                    "measurement": "camera",
+                    "tags": {
+                        "sensor": "picam"
+                    },
+                    "fields": {
+                        "fall_detected": 1,
+                        "emotion": global_expression
+                    },
+                    "time": int(time.time() * 1e9)
+                }
+            ]
+            influx_client.write_points(json_body)
+        else:
+            global_critical_alert = "ALERT_OK"
 
     elif topic == config.TOPIC_CAM and payload:
         if str(payload.get('fall_detected')) == '1':
@@ -194,7 +190,7 @@ def handle_emergency(mqtt_client):
     hw.trigger_emergency()
     # Publish an immediate env/state message so central system knows
     mqtt_client.publish(config.TOPIC_ENV, {"event": "fall", "ts": time.time()})
-    time.sleep(60)
+    time.sleep(3)
     hw.reset_emergency()
 
 
