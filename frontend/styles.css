@@ -52,23 +52,26 @@ body{
 .hero h1{font-size:40px; margin:0; line-height:1.1}
 .hero .cta{display:flex; gap:12px}
 .btn{display:inline-flex; align-items:center; gap:8px; padding:10px 16px; border-radius:10px; cursor:pointer; border:0; font-weight:500}
-.btn-primary{background:var(--accent); color:white}
+.btn-primary{background:var(--success); color:white}
+.btn-primary:hover{filter:brightness(0.95)}
+.hero h1{font-size:32px; margin:0; line-height:1.1; font-weight:700}
 .btn-secondary{background:transparent; border:1px solid var(--divider); color:var(--text)}
 
 .grid{display:grid; grid-template-columns:repeat(12,1fr); gap:16px}
 .col-8{grid-column:span 8}
 .col-4{grid-column:span 4}
 
-.card{background:var(--paper); border:1px solid var(--divider); padding:16px; border-radius:10px; box-shadow:0 1px 6px rgba(20,20,20,0.03)}
+.card{background:var(--paper); border:1px solid transparent; padding:14px; border-radius:12px; box-shadow:none}
+.card.minimal{border:1px solid var(--divider); padding:18px}
 .status{display:flex; flex-direction:column; gap:8px}
 .status h3{margin:0; font-size:16px; color:var(--muted)}
 .status p{margin:0; font-size:15px}
 
-canvas{width:100% !important; height:320px !important}
-
-/* Dashboard grid simplification for canvases */
 .charts{display:grid; grid-template-columns:repeat(2, 1fr); gap:18px}
-.charts canvas{height:360px}
+.charts .chart-card{background:var(--paper); border-radius:10px; padding:12px; border:1px solid var(--divider)}
+.charts canvas{height:320px}
+
+.chart-title{font-size:15px; margin:0 0 8px 0; color:var(--muted); font-weight:600}
 
 /* Mobile */
 @media (max-width:900px){
