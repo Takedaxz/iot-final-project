@@ -5,6 +5,7 @@
     <title>ElderSafe Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+    <script src="config.js"></script>
 </head>
 <body>
     <h1>ElderSafe Historical Dashboard</h1>
@@ -40,7 +41,7 @@
 
         async function loadDashboard() {
             try {
-                const response = await fetch('https://logic-allocated-chapters-assessed.trycloudflare.com/dashboard_data');
+                const response = await fetch(BASE_URL + '/dashboard_data');
                 // const response = await fetch('http://localhost:5000/dashboard_data');
                 const data = await response.json();
 

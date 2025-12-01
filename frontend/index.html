@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ElderSafe Camera Stream</title>
+    <script src="config.js"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f0f0f0; }
         h1 { color: #333; }
@@ -23,7 +24,7 @@
     <div class="container">
         <div class="video-container">
             <h2>Live Feed</h2>
-            <img src="https://logic-allocated-chapters-assessed.trycloudflare.com/video_feed" alt="Live Camera Feed">
+            <img src="${BASE_URL}/video_feed" alt="Live Camera Feed">
             <!-- <img src="http://localhost:5000/video_feed" alt="Live Camera Feed"> -->
         </div>
         <div class="status-container">
@@ -48,7 +49,7 @@
     <script>
         function updateStatus() {
             // fetch('https://logic-allocated-chapters-assessed.trycloudflare.com/env_status_api')
-            fetch('http://localhost:5000/env_status_api')
+            fetch(BASE_URL + '/env_status_api')
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('temp').textContent = data.temperature;

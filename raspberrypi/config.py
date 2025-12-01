@@ -1,5 +1,6 @@
 # config.py
 #source .venv/bin/activate
+#/usr/local/bin/cloudflared tunnel --url http://localhost:5000
 # MQTT Settings
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
