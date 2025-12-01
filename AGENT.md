@@ -2,195 +2,127 @@
 
 ## Project Analysis Summary
 
-This document provides a comprehensive technical overview of the ElderSafe AI project for AI agents to understand, maintain, and extend the codebase. The project is an IoT elder safety system with two main components: an ESP32-based smart cane and a Raspberry Pi gateway with AI vision capabilities.
+This document provides a concise, up-to-date technical overview of the ElderSafe AI project intended for maintainers and agents. The project is an IoT elder safety system with two main components: an ESP32-based smart cane and a Raspberry Pi gateway with vision and local logging.
 
 ## Architecture Overview
 
 ### System Components
-1. **Smart Cane (ESP32)**: Mobile sensor node that detects motion and sound, publishes to MQTT.
-2. **Home Gateway (Raspberry Pi)**: Central processing unit that handles AI vision, hardware control, and data logging.
-3. **MQTT Broker**: Message routing between devices.
-4. **InfluxDB**: Time-series database for sensor data storage (planned but not fully implemented).
+1. **Smart Cane (ESP32)**: Mobile sensor node that detects motion and sound and publishes to MQTT (`elder/sensor/motion`).
+2. **Home Gateway (Raspberry Pi)**: Central processing unit that handles vision processing, hardware control, MQTT forwarding, and time-series logging.
+3. **MQTT Broker**: Message routing between devices and cloud forwarding topics.
+4. **InfluxDB**: Local time-series database used by the gateway; the code writes `motion`, `camera` and `environment` points.
 
 ### Communication Flow
 - ESP32 → MQTT Broker → Raspberry Pi (motion data)
-- Raspberry Pi → MQTT Broker → Central Server (processed data, env data, forwarded motion)
+- Raspberry Pi → MQTT Broker → Cloud topic (forwarded motion) and other consumers
 - Raspberry Pi ↔ Hardware (GPIO control for actuators)
+- Raspberry Pi → InfluxDB (local time-series writes)
 
 ## Codebase Analysis
 
 ### ESP32 Firmware (`src/main.cpp`)
-**Purpose**: Reads MPU6050 accelerometer and microphone, calculates G-force, publishes MQTT messages.
+**Purpose**: Reads MPU6050 accelerometer and microphone, calculates G-force, and publishes MQTT messages.
 
 **Key Functions**:
 - `setup()`: Initializes WiFi, MQTT, MPU6050 sensor.
-- `loop()`: Continuously reads sensors, publishes data every 1 second.
+- `loop()`: Continuously reads sensors and publishes data (interval configured on device).
 - `reconnect()`: Handles MQTT reconnection.
 
-**Libraries Used**:
-- `Adafruit_MPU6050`: Accelerometer/gyroscope sensor.
-- `PubSubClient`: MQTT client.
-- `ArduinoJson`: JSON serialization.
-
-**Current Implementation Notes**:
-- Publishes raw sensor data without filtering.
-- No battery management or sleep modes.
-- Hardcoded WiFi credentials and MQTT broker IP.
+**Notes**:
+- Publishes raw sensor data without advanced filtering on the device.
+- No battery management or aggressive sleep implemented yet.
 
 ### Raspberry Pi Gateway (`raspberrypi/`)
 
 #### Main Application (`main.py`)
-**Purpose**: Orchestrates MQTT communication, vision processing, and emergency responses.
+**Purpose**: Orchestrates MQTT communication, vision processing for live stream (emotion labels), emergency responses, environment reads, and DB writes.
 
-**Key Logic**:
-- Subscribes to `elder/sensor/motion` and `elder/sensor/cam`.
-- On high G-force (>2), triggers vision analysis.
-- On confirmed fall, activates emergency protocol (buzzer + servo).
-- Runs environmental monitoring loop in background.
+**Key Logic (current)**:
+- Subscribes to `elder/sensor/motion` and `elder/gateway/cam` topics.
+- On high G-force (> `config.G_FORCE_LIMIT`) the gateway now triggers the emergency protocol immediately. Vision verification has been removed — emergency is threshold-driven.
+- Emergency protocol activates hardware (buzzer, servo) and sets an RGB LED visual alert; it also publishes an immediate environment/state message to `elder/gateway/env` so central systems are notified.
+- Periodic environment publishing and DB writes run in background threads.
 
 **Threads**:
-- Main thread: MQTT handling.
-- Env thread: Periodic sensor publishing.
-- Emergency thread: Hardware activation with timeout.
+- Main thread: Flask app and MQTT initialization.
+- Env thread: Periodic sensor publishing and InfluxDB writes.
+- Emotion thread: Periodic emotion publish and InfluxDB writes.
+- Emergency handling runs in its own short-lived thread when triggered.
 
 #### Configuration (`config.py`)
-**Settings**:
-- MQTT broker: localhost:1883
-- GPIO pins: Buzzer(21), Servo(22), DHT(27), Smoke(17)
-- Thresholds: G_FORCE_LIMIT = 2
-- Intervals: ENV_INTERVAL = 5 seconds
-- Topics: motion="elder/sensor/motion", cam="elder/gateway/cam", env="elder/gateway/env", cloud_motion="elder/cloud/motion"
+**Key settings**:
+- MQTT broker: `localhost:1883` (configurable)
+- GPIO pins: buzzer, servo, DHT, smoke, RGB pins available in `config.py`
+- Thresholds: `G_FORCE_LIMIT` controls emergency trigger (default 2)
+- ENV publishing interval: `ENV_INTERVAL` (default 5s)
+- InfluxDB database name: `INFLUXDB_BUCKET` (default `eldersafe`)
 
 #### Modules
 
 ##### `hardware_ctrl.py` - Hardware Manager
-**Features**:
-- GPIO control for buzzer and servo.
-- DHT11 temperature/humidity sensor reading.
-- Smoke sensor (digital): 1 if detected, 0 otherwise.
-- Graceful fallback to mock mode when not on Raspberry Pi.
+**Features (current)**:
+- GPIO control for buzzer and servo (via `gpiozero`).
+- DHT11 temperature/humidity reading with a retry loop (3 attempts) to mitigate DHT timing "full buffer" errors.
+- Smoke sensor reading (digital/ADC fallback).
+- RGB LED control (via `gpiozero.RGBLED`) for visual emergency indication.
+- Mock/fallback behavior when running off-target (development machines without GPIO).
 
-**Safety Features**:
-- Exception handling for GPIO failures.
-- Lazy initialization of DHT sensor.
+**Safety**:
+- Exception handling on hardware init and sensor reads.
+- Reset methods to turn actuators off after emergency.
 
 ##### `mqtt_handler.py` - MQTT Handler
 **Features**:
-- Simple wrapper around paho-mqtt.
-- JSON serialization for dict payloads.
-- Connection management.
+- Thin wrapper around `paho-mqtt` to publish JSON payloads and handle subscriptions.
 
 ##### `vision_ai.py` - Vision System
-**Features**:
-- OpenCV-based face detection using Haar cascades.
-- Heuristic fall detection based on face bounding box aspect ratio.
-- Mock emotion detection (random selection).
-- Fallback to random results when OpenCV unavailable.
+**Features (current)**:
+- MediaPipe/OpenCV face-landmark analysis runs in the live stream to produce heuristic `expression` labels.
 
-**Current Limitations**:
-- Basic heuristics, not real AI/ML models.
-- No emotion detection model implemented.
-- Single frame analysis, no temporal tracking.
+**Limitations**:
+- The system no longer relies on vision to confirm falls — emergency is threshold-driven. Vision still runs for emotion/overlay in the stream and periodic publishes.
+- Emotion detection is heuristic and not an ML model; consider TFLite/DeepFace replacements for production.
 
-## Dependencies & Requirements
+## Data & Storage
 
-### ESP32 (`platformio.ini`)
-- espressif32 platform
-- Arduino framework
-- Libraries: MPU6050, PubSubClient, ArduinoJson
+- The gateway writes time-series points to a local InfluxDB instance (default DB `eldersafe`). Measurements written include `environment`, `motion`, `camera`, and `cloud_motion`.
+- The Flask endpoint `/dashboard_data` queries InfluxDB (last 24h) and returns JSON for the frontend charts.
+- The live UI (`/env_status_api`) returns the most recent global variables updated by `env_loop` and MQTT handlers (fast polling endpoint used by `index.html`).
+- Motion events are also forwarded to a cloud topic (`elder/cloud/motion`) via MQTT so cloud consumers receive raw motion data.
 
-### Raspberry Pi (`requirements.txt`)
-- paho-mqtt: MQTT communication
-- opencv-python: Computer vision
-- influxdb-client: Database (not used yet)
-- adafruit-circuitpython-dht: Temperature sensor
-- RPi.GPIO, gpiozero: Hardware control
+## Frontend
 
-## Current System Status (Updated 2025-11-29)
+- Static frontend files live under `frontend/` (not Flask templates in `templates/`): `index.html`, `dashboard.html`, `styles.css`, and `config.js`.
+- `config.js` exposes `BASE_URL` so the frontend can work with tunnels (Cloudflare / cloudflared) or local endpoints.
+- Dashboard charts use Chart.js (category X-axis with formatted labels) and a client-side SMA implementation for trends to avoid date-adapter version mismatches.
+- The live feed endpoint is `/video_feed` (multipart MJPEG stream used by `index.html`).
+
+## Networking & CORS
+
+- Flask config includes explicit CORS origins to allow frontend access (e.g., the tunnel URL, `localhost`).
+- MQTT forwarding continues to publish to `TOPIC_CLOUD_MOTION` for cloud integrations.
+
+## Current System Status (Updated 2025-12-01)
 
 ### Implemented Features ✅
-- ✅ ESP32 sensor reading and MQTT publishing (`elder/sensor/motion`)
-- ✅ Raspberry Pi MQTT subscription, processing, and forwarding (`elder/cloud/motion`)
-- ✅ Vision AI heuristics for fall detection (basic face detection)
-- ✅ Hardware control: DHT11 temp/humidity, digital smoke sensor
-- ✅ Environmental monitoring and publishing (`elder/gateway/env`)
-- ✅ Emergency protocol (buzzer/servo actuators, commented for testing)
-- ✅ **Web streaming with live Pi Camera feed and emotion detection** (dashboard at http://<pi-ip>:5000)
-- ✅ MQTT-based pub/sub architecture for real-time communication
+- ✅ ESP32 sensor reading and MQTT publishing (`elder/sensor/motion`).
+- ✅ MQTT forwarding of raw motion to a cloud topic (`elder/cloud/motion`).
+- ✅ Immediate emergency trigger on high G-force (vision verification removed).
+- ✅ Hardware control for buzzer, servo, and RGB LED for visual alerts.
+- ✅ DHT11 robustness via retry logic and smoke detection.
+- ✅ Local InfluxDB writes for `environment`, `motion`, `camera` and `cloud_motion`.
+- ✅ Flask web server that serves a live camera stream and frontend static pages; `/env_status_api` and `/dashboard_data` endpoints for the UI.
 
-### Current Architecture
-- **ESP32 (Edge)**: Publishes motion/sound data to `elder/sensor/motion`
-- **Raspberry Pi (Gateway)**:
-  - Subscribes to `elder/sensor/motion`, forwards to `elder/cloud/motion`
-  - Processes high G-force events, triggers vision analysis
-  - Publishes vision results to `elder/gateway/cam`
-  - Publishes env data to `elder/gateway/env` every 5 seconds
-  - **Runs web stream at http://<pi-ip>:5000** with live camera, MediaPipe AI, and dashboard
-- **Topics**:
-  - `elder/sensor/motion`: Raw motion from ESP32
-  - `elder/cloud/motion`: Forwarded motion for cloud
-  - `elder/gateway/cam`: Vision/fall detection results
-  - `elder/gateway/env`: Temp, humidity, smoke data
-- **Hardware**: DHT11 (GPIO 15), MQ smoke DO (GPIO 17), actuators ready
+### Known Issues / Next Steps
+- Confirm InfluxDB persistence and retention policies in deployment.
+- Replace heuristic emotion detection with a small ML model or TFLite for better accuracy.
+- Physically validate actuator wiring (buzzer, servo, RGB) and ensure correct PWM-capable GPIO pins are used.
+- Improve error handling around InfluxDB queries and empty datasets returned to the frontend.
 
-### Known Issues
-- Actuators (buzzer/servo) commented out for testing
-- Vision uses basic heuristics, not robust AI
-- No data persistence or cloud integration yet
-- GPIO errors possible on some Pi setups
-
-## Development Roadmap
-
-### Immediate Next Steps (Priority 1-3)
-1. **InfluxDB Integration**:
-   - Set up InfluxDB Docker container
-   - Configure MQTT subscription to `elder/cloud/#` topics
-   - Store motion, env, and vision data as time-series
-
-2. **Grafana Dashboard**:
-   - Connect Grafana to InfluxDB
-   - Create dashboard for real-time monitoring (temp, smoke, motion charts)
-   - Add alerts for smoke detection and high G-force
-
-3. **Enhanced Vision AI**:
-   - Replace mock emotion detection with DeepFace or TensorFlow Lite
-   - Implement pose estimation for better fall detection
-   - Add temporal tracking for motion analysis
-
-### Medium-Term Improvements (Priority 4-6)
-4. **Security & Reliability**:
-   - Add MQTT TLS encryption
-   - Implement LWT for device monitoring
-   - Add reconnection logic with exponential backoff
-
-5. **Actuator Integration**:
-   - Uncomment and test buzzer/servo GPIO code
-   - Add timeout and reset logic for emergency responses
-
-6. **Testing & CI/CD**:
-   - Unit tests for modules (hardware, vision, MQTT)
-   - Integration tests for end-to-end MQTT flow
-   - GitHub Actions for automated testing
-
-### Long-Term Enhancements (Priority 7+)
-7. **ESP32 Optimizations**:
-   - Battery management and sleep modes
-   - Over-the-air updates
-
-8. **Cloud Deployment**:
-   - Docker containerization for Pi services
-   - Cloud MQTT broker (e.g., AWS IoT, HiveMQ)
-   - REST API for external integrations
-
-9. **Advanced Features**:
-   - Multi-camera support
-   - Machine learning model training on collected data
-   - Mobile app for caregiver notifications
-
-### Deployment Considerations
-- Docker for InfluxDB/Grafana on Pi or separate server
-- Environment-specific configs (dev/prod)
-- Automated setup scripts for new deployments
+## Development Roadmap (short)
+1. Verify InfluxDB and dashboard queries; add unit tests for DB query handling.
+2. Improve vision/emotion model and add temporal smoothing.
+3. Harden MQTT reconnection and add TLS/LWT for production.
 
 ## File Structure Reference
 
@@ -208,8 +140,8 @@ IoT-final/
 │       ├── hardware_ctrl.py    # GPIO/hardware control
 │       ├── mqtt_handler.py     # MQTT wrapper
 │       └── vision_ai.py        # Computer vision
-└── test/                       # Testing (empty)
+└── frontend/                    # Static frontend files: index.html, dashboard.html, config.js, styles.css
 ```
 
-This documentation should be updated as the project evolves. Focus on completing the AI models and database integration for a functional prototype.</content>
+This documentation should be updated as the project evolves. Focus next on DB verification and improving vision/emotion detection for reliability.
 <parameter name="filePath">c:\Users\Patta\OneDrive\Documents\PlatformIO\Projects\IoT-final\AGENT.md
