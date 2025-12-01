@@ -7,3 +7,7 @@ raspberrypi/modules/__pycache__
 */.venv
 .DS_Store
 */__pycache__
+ngrok-bin
+ngrok-stable-linux-arm.zip
+ngrok.log
+ngrok.pid

@@ -111,12 +111,17 @@ class HardwareManager:
         if HAVE_DHT:
             self._init_dht()
             if self._dht is not None:
-                try:
-                    temp = self._dht.temperature
-                    hum = self._dht.humidity
-                    # print(f"[DEBUG] DHT read: temp={temp}, hum={hum}")
-                except Exception as e:
-                    print(f"[DEBUG] DHT read failed: {e}")
+                for attempt in range(3):  # Retry up to 3 times
+                    try:
+                        temp = self._dht.temperature
+                        hum = self._dht.humidity
+                        # print(f"[DEBUG] DHT read: temp={temp}, hum={hum}")
+                        break  # Success, exit retry loop
+                    except Exception as e:
+                        print(f"[DEBUG] DHT read failed (attempt {attempt+1}): {e}")
+                        time.sleep(2)  # Wait before retry
+                else:
+                    print("[DEBUG] DHT read failed after 3 attempts")
                     temp = None
                     hum = None
 

@@ -317,7 +317,7 @@ def env_status_api():
     return jsonify({
         "temperature": global_temperature,
         "humidity": global_humidity,
-        "fall_status": "Status: OK",  # Placeholder, updated from vision
+        # "fall_status": "Status: OK",  # Placeholder, updated from vision
         "smoke_status": global_smoke_status,
         "critical_alert": global_critical_alert,
         "g_force_latest": global_latest_g_force,

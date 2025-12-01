@@ -35,7 +35,6 @@
             <div class="status">
                 <h3>Motion & Fall Detection</h3>
                 <p>G-Force: <span id="gforce">Loading...</span></p>
-                <p>Fall Status: <span id="fall">Loading...</span></p>
                 <p>Expression: <span id="expression">Loading...</span></p>
             </div>
             <div class="status">
@@ -54,7 +53,6 @@
                     document.getElementById('hum').textContent = data.humidity;
                     document.getElementById('smoke').textContent = data.smoke_status;
                     document.getElementById('gforce').textContent = data.g_force_latest;
-                    document.getElementById('fall').textContent = data.fall_status;
                     document.getElementById('expression').textContent = data.expression;
                     document.getElementById('alert').textContent = data.critical_alert;
 
