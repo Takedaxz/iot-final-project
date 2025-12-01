@@ -154,7 +154,7 @@
                 // Humidity
                 const humLabels = humPoints.map(p => p.label);
                 const humValues = humPoints.map(p => p.y);
-                const humSMAVals = humSMA.map(p => p.y);
+                // const humSMAVals = humSMA.map(p => p.y);
                 new Chart(document.getElementById('humChart'), {
                     type: 'line',
                     data: {
@@ -170,7 +170,7 @@
                 // G-Force
                 const gLabels = gForcePoints.map(p => p.label);
                 const gValues = gForcePoints.map(p => p.y);
-                const gSMAVals = gForceSMA.map(p => p.y);
+                // const gSMAVals = gForceSMA.map(p => p.y);
                 new Chart(document.getElementById('gForceChart'), {
                     type: 'line',
                     data: {
