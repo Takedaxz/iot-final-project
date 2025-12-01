@@ -3,7 +3,7 @@ import time
 import random
 
 try:
-    from gpiozero import Buzzer, Servo, Button
+    from gpiozero import Buzzer, Servo, Button, RGBLED
     HAVE_GPIOZERO = True
 except Exception:
     HAVE_GPIOZERO = False
@@ -38,11 +38,21 @@ class HardwareManager:
         self._gpio_ready = False
         self.buzzer = None
         self.servo = None
+        self.rgb = None
         self.smoke_sensor = None
         if HAVE_GPIOZERO:
             try:
                 self.buzzer = Buzzer(self.cfg.PIN_BUZZER)
                 self.servo = Servo(self.cfg.PIN_SERVO)
+                # Initialize RGB LED if pins provided
+                try:
+                    r = getattr(self.cfg, 'PIN_RGB_R', None)
+                    g = getattr(self.cfg, 'PIN_RGB_G', None)
+                    b = getattr(self.cfg, 'PIN_RGB_B', None)
+                    if None not in (r, g, b):
+                        self.rgb = RGBLED(r, g, b)
+                except Exception as e:
+                    print(f"[HARDWARE] RGB init failed: {e}")
                 self.smoke_sensor = Button(self.cfg.PIN_SMOKE, pull_up=True)
                 self._gpio_ready = True
             except Exception as e:
@@ -81,6 +91,16 @@ class HardwareManager:
         if self._gpio_ready:
             try:
                 self.buzzer.on()
+                # turn RGB red if available
+                if self.rgb is not None:
+                    try:
+                        self.rgb.color = (1, 0, 0)
+                    except Exception:
+                        # fallback: set red pin high if no pwm
+                        try:
+                            self.rgb.red = 1
+                        except Exception:
+                            pass
                 self.servo.max()
                 time.sleep(1)
                 self.servo.detach()
@@ -97,6 +117,15 @@ class HardwareManager:
         if self._gpio_ready:
             try:
                 self.buzzer.off()
+                # turn RGB off if available
+                if self.rgb is not None:
+                    try:
+                        self.rgb.off()
+                    except Exception:
+                        try:
+                            self.rgb.color = (0, 0, 0)
+                        except Exception:
+                            pass
                 self.servo.min()
                 time.sleep(1)
                 self.servo.detach()

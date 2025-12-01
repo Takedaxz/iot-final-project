@@ -14,6 +14,10 @@ PIN_BUZZER = 21
 PIN_SERVO = 22
 PIN_DHT = 15
 PIN_SMOKE = 17
+# RGB LED pins (BCM) - set to your connected pins
+PIN_RGB_R = 5
+PIN_RGB_G = 6
+PIN_RGB_B = 13
 
 # ADC Settings for analog sensors
 SMOKE_ADC_CHANNEL = 0  # ADS1115 channel for smoke sensor (AO pin)
