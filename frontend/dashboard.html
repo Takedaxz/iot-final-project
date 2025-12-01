@@ -55,26 +55,7 @@
             </div>
 
     <script>
-        // Function to calculate Simple Moving Average and return aligned points
-        // Accepts points shaped like [{ts: Date, label: string, y: number|null}]
-        function calculateSMAPoints(points, windowSize) {
-            const smaPoints = [];
-            for (let i = 0; i < points.length; i++) {
-                // build the window slice (may include nulls)
-                const start = Math.max(0, i - windowSize + 1);
-                const windowSlice = points.slice(start, i + 1).map(p => p.y);
-                // filter to numeric values only
-                const nums = windowSlice.filter(v => v !== null && v !== undefined && !isNaN(Number(v))).map(Number);
-                if (nums.length < windowSize) {
-                    // not enough numeric samples yet
-                    smaPoints.push({ ts: points[i].ts || null, label: points[i].label || '', y: null });
-                } else {
-                    const sum = nums.reduce((a, b) => a + b, 0);
-                    smaPoints.push({ ts: points[i].ts || null, label: points[i].label || '', y: sum / nums.length });
-                }
-            }
-            return smaPoints;
-        }
+        // (SMA removed) dashboard will show raw series only
 
         // Map emotions to numbers for charting
         const emotionMap = {
@@ -140,10 +121,7 @@
                     return { ts: dt, label: dt.toLocaleString(), y: (isNaN(Number(yVal)) ? null : Number(yVal)) };
                 }).filter(Boolean);
 
-                const smaWindow = 5;
-                const tempSMA = calculateSMAPoints(tempPoints, smaWindow);
-                const humSMA = calculateSMAPoints(humPoints, smaWindow);
-                const gForceSMA = calculateSMAPoints(gForcePoints, smaWindow);
+                // SMA removed — only plotting raw values
 
                 const commonOptions = {
                     plugins: { legend: { position: 'top' } },
@@ -167,7 +145,7 @@
                         labels: tempLabels,
                         datasets: [
                             { label: 'Temperature (°C)', data: tempValues, borderColor: 'red', backgroundColor: 'rgba(255,0,0,0.05)', fill: false, pointRadius: 2 },
-                            { label: `Temperature SMA (${smaWindow})`, data: tempSMAVals, borderColor: 'orange', borderDash: [6, 4], pointRadius: 0 }
+                            
                         ]
                     },
                     options: commonOptions
@@ -183,7 +161,7 @@
                         labels: humLabels,
                         datasets: [
                             { label: 'Humidity (%)', data: humValues, borderColor: 'blue', backgroundColor: 'rgba(0,0,255,0.05)', fill: false, pointRadius: 2 },
-                            { label: `Humidity SMA (${smaWindow})`, data: humSMAVals, borderColor: 'cyan', borderDash: [6, 4], pointRadius: 0 }
+                            
                         ]
                     },
                     options: commonOptions
@@ -199,7 +177,7 @@
                         labels: gLabels,
                         datasets: [
                             { label: 'G-Force', data: gValues, borderColor: 'green', backgroundColor: 'rgba(0,128,0,0.05)', fill: false, pointRadius: 2 },
-                            { label: `G-Force SMA (${smaWindow})`, data: gSMAVals, borderColor: 'lime', borderDash: [6, 4], pointRadius: 0 }
+                            
                         ]
                     },
                     options: commonOptions

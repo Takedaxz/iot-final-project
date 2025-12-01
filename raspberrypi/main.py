@@ -41,6 +41,7 @@ global_humidity = "N/A"
 global_smoke_status = "SMOKE_OK"
 global_critical_alert = "ALERT_OK"
 global_latest_g_force = 0.0
+global_camera_fall_detected = False
 
 # Emotion mapping (string -> numeric code)
 EMOTION_MAP = {
@@ -206,6 +207,7 @@ def handle_emergency(mqtt_client):
 
 def emotion_publish_loop(mqtt_client):
     global global_expression
+    global global_camera_fall_detected
     while True:
         # Use vision system to analyze scene (may return None on error)
         fall_flag = '0'
@@ -219,7 +221,11 @@ def emotion_publish_loop(mqtt_client):
         # If vision detects a fall, trigger emergency (same behavior as g-force)
         if fall_flag == '1':
             print('[VISION] Fall detected by camera -> triggering emergency protocol')
+            # update global for overlay
+            global_camera_fall_detected = True
             threading.Thread(target=handle_emergency, args=(mqtt_client,)).start()
+        else:
+            global_camera_fall_detected = False
 
         # Publish current emotion and fall flag
         payload = {"fall_detected": fall_flag, "emotions": global_expression}
@@ -290,6 +296,7 @@ def env_loop(mqtt_client):
 # --------------------------------------------------
 def generate_frames():
     global global_expression
+    global global_camera_fall_detected, global_critical_alert
 
     with mp_face_mesh.FaceMesh(max_num_faces=1,
                                refine_landmarks=True,
@@ -315,8 +322,13 @@ def generate_frames():
                 lm = face_result.multi_face_landmarks[0].landmark
                 expression = classify_emotion(lm)
             global_expression = expression
-            cv2.putText(frame, f"Expr: {expression}", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+            # overlay emotion and standing/fall status
+            expr_code = EMOTION_MAP.get(global_expression, -1)
+            fall_state = "FALL" if (global_camera_fall_detected or global_critical_alert == "FALL DETECTED") else "Standing"
+            cv2.putText(frame, f"Expr: {expression} ({expr_code})", (10, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
+            cv2.putText(frame, f"Status: {fall_state}", (10, 60),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255) if fall_state=="FALL" else (0,255,0), 2)
 
             ret, buf = cv2.imencode(".jpg", frame)
             if not ret: continue
