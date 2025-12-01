@@ -1,0 +1,34 @@
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Accel as Accelerometer Node
+    participant Broker as MQTT Broker
+    participant MQTT as MQTTHandler (Gateway)
+    participant Logic as Logic Controller
+    participant Vision as VisionSystem
+    participant Hardware as HardwareManager
+    participant EnvLoop as Env Loop
+    participant Server as Central Server
+
+    Accel->>Broker: publish\n`elder/sensor/motion`\n{g_force, device_id, ts}
+    Broker->>MQTT: deliver message
+    MQTT->>Logic: on_message(topic, payload)
+    Logic->>Vision: analyze_scene()
+    Vision-->>Logic: {"fall_detected":"0|1","emotions":"...","confidence":0.0}
+
+    alt fall verified
+        Logic->>MQTT: publish `elder/gateway/cam`\n{device_id, fall_detected, confidence, ts}
+        Logic->>Hardware: trigger_emergency()
+        Hardware->>MQTT: publish `elder/gateway/env`\n{event:"fall", ts}
+    end
+
+    EnvLoop->>Hardware: read_env()
+    EnvLoop->>MQTT: publish `elder/gateway/env`\n{temp, humidity, smoke, ts}
+
+    MQTT->>Broker: publish topics
+    Broker->>Server: forward publishes (central server subscribed)
+
+    Note right of MQTT: Uses `paho-mqtt`\nConsider adding TLS, LWT, and reconnect/backoff
+    Note left of Hardware: - Safe mock mode when not on Raspberry Pi\n- Controls buzzer, servo, RGB LED, reads DHT (with retries)
+    Note over Logic, Vision: Message schema suggestions:\nInclude `device_id`, `ts`, `seq`, and `confidence` where applicable
+```

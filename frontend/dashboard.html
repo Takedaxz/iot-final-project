@@ -56,17 +56,21 @@
 
     <script>
         // Function to calculate Simple Moving Average and return aligned points
+        // Accepts points shaped like [{ts: Date, label: string, y: number|null}]
         function calculateSMAPoints(points, windowSize) {
-            // points: [{x: Date, y: number}]
-            const values = points.map(p => (p.y == null ? 0 : p.y));
             const smaPoints = [];
             for (let i = 0; i < points.length; i++) {
-                if (i < windowSize - 1) {
-                    smaPoints.push({ x: points[i].x, y: null });
+                // build the window slice (may include nulls)
+                const start = Math.max(0, i - windowSize + 1);
+                const windowSlice = points.slice(start, i + 1).map(p => p.y);
+                // filter to numeric values only
+                const nums = windowSlice.filter(v => v !== null && v !== undefined && !isNaN(Number(v))).map(Number);
+                if (nums.length < windowSize) {
+                    // not enough numeric samples yet
+                    smaPoints.push({ ts: points[i].ts || null, label: points[i].label || '', y: null });
                 } else {
-                    const window = values.slice(i - windowSize + 1, i + 1);
-                    const sum = window.reduce((a, b) => a + b, 0);
-                    smaPoints.push({ x: points[i].x, y: sum / windowSize });
+                    const sum = nums.reduce((a, b) => a + b, 0);
+                    smaPoints.push({ ts: points[i].ts || null, label: points[i].label || '', y: sum / nums.length });
                 }
             }
             return smaPoints;

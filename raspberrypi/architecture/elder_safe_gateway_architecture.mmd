@@ -1,0 +1,39 @@
+graph TD
+  %% High-level system architecture for ElderSafe Gateway
+  subgraph Edge
+    A["Smart Cane<br/>(ESP32)<br/>publishes elder/sensor/motion"] -->|MQTT publish\n`elder/sensor/motion`| Broker[MQTT Broker - local]
+  end
+  
+  subgraph Gateway ["ElderSafe Gateway (Raspberry Pi)"]
+    direction TB
+    MQ["MqttHandler<br/>(MQTT client)"]
+    LG["Logic Controller"]
+    VS["VisionSystem<br/>(MediaPipe/OpenCV)"]
+    HW["Hardware Manager<br/>(buzzer, servo, RGB, DHT, smoke)"]
+    EL["Env Loop<br/>(periodic env reads)"]
+    FW["Flask Frontend<br/>/video_feed, /env_status_api, /dashboard_data"]
+    
+    Broker -->|delivers messages\n`elder/sensor/motion`| MQ
+    MQ -->|on_message\n`elder/sensor/motion`| LG
+    LG -->|triggers| HW
+    LG -->|requests optional| VS
+    EL -->|reads sensors| HW
+    
+    %% DB writes and publishes
+    LG -->|write points| Influx[InfluxDB - on-premise]
+    EL -->|write points| Influx
+    VS -->|publish emotion / camera events\n`elder/gateway/cam`| MQ
+    MQ -->|deliver camera topic\n`elder/gateway/cam`| LG
+    FW -->|HTTP UI queries| LG
+    LG -->|query points for dashboard (proxy)| Influx
+    LG -->|publish forwarded motion\n`elder/cloud/motion` (optional)| MQ
+    MQ -->|publish/subscribe| LG
+    EL -->|publish env state\n`elder/gateway/env`| MQ
+  end
+  
+  %% External flows - Public tunnel for remote access
+  Tunnel["Cloudflare Tunnel<br/>(cloudflared public URL)"] -->|forwards HTTP to| FW
+  Browser[Caregiver Browser] -->|requests via public URL| Tunnel
+  
+  classDef node fill:#f8f9fb,stroke:#e6e8eb,color:#0f1724
+  class A,Broker,MQ,LG,VS,HW,EL,FW,Influx,Browser,Tunnel node

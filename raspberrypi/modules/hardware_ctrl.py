@@ -3,7 +3,7 @@ import time
 import random
 
 try:
-    from gpiozero import Buzzer, Servo, Button, RGBLED
+    from gpiozero import Buzzer, Servo, Button, RGBLED, LED
     HAVE_GPIOZERO = True
 except Exception:
     HAVE_GPIOZERO = False
@@ -39,6 +39,7 @@ class HardwareManager:
         self.buzzer = None
         self.servo = None
         self.rgb = None
+        self.led = None
         self.smoke_sensor = None
         if HAVE_GPIOZERO:
             try:
@@ -53,6 +54,13 @@ class HardwareManager:
                         self.rgb = RGBLED(r, g, b)
                 except Exception as e:
                     print(f"[HARDWARE] RGB init failed: {e}")
+                # Initialize single digital LED if provided (PIN_LED)
+                try:
+                    led_pin = getattr(self.cfg, 'PIN_LED', None)
+                    if led_pin is not None:
+                        self.led = LED(led_pin)
+                except Exception as e:
+                    print(f"[HARDWARE] LED init failed: {e}")
                 self.smoke_sensor = Button(self.cfg.PIN_SMOKE, pull_up=True)
                 self._gpio_ready = True
             except Exception as e:
@@ -101,6 +109,12 @@ class HardwareManager:
                             self.rgb.red = 1
                         except Exception:
                             pass
+                # If a single LED is present, turn it on as well
+                if self.led is not None:
+                    try:
+                        self.led.on()
+                    except Exception:
+                        pass
                 self.servo.max()
                 time.sleep(1)
                 self.servo.detach()
@@ -126,6 +140,12 @@ class HardwareManager:
                             self.rgb.color = (0, 0, 0)
                         except Exception:
                             pass
+                # turn single LED off if available
+                if self.led is not None:
+                    try:
+                        self.led.off()
+                    except Exception:
+                        pass
                 self.servo.min()
                 time.sleep(1)
                 self.servo.detach()

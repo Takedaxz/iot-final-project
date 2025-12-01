@@ -356,9 +356,24 @@ def dashboard_data():
         for point in fall_result.get_points():
             fall_data.append({"time": point['time'], "value": point.get('fall_detected', 0)})
 
+    # Map string emotions to numeric codes so frontend charting is consistent
+    emotion_map = {
+        'Neutral': 0,
+        'Happy': 1,
+        'Sad': 2,
+        'Surprised': 3,
+        'No Face': -1
+    }
     if emotion_result:
         for point in emotion_result.get_points():
-            emotion_data.append({"time": point['time'], "value": point.get('emotion', 'Unknown')})
+            raw = point.get('emotion', 'Unknown')
+            # Influx may return bytes/str; ensure str
+            try:
+                raw_str = str(raw)
+            except Exception:
+                raw_str = 'Unknown'
+            mapped = emotion_map.get(raw_str, -1)
+            emotion_data.append({"time": point['time'], "value": mapped})
 
     return jsonify({
         "temp_data": temp_data,
