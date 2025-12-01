@@ -11,3 +11,4 @@ ngrok-bin
 ngrok-stable-linux-arm.zip
 ngrok.log
 ngrok.pid
+*.json

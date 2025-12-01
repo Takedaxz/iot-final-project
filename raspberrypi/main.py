@@ -42,6 +42,15 @@ global_smoke_status = "SMOKE_OK"
 global_critical_alert = "ALERT_OK"
 global_latest_g_force = 0.0
 
+# Emotion mapping (string -> numeric code)
+EMOTION_MAP = {
+    'Neutral': 0,
+    'Happy': 1,
+    'Sad': 2,
+    'Surprised': 3,
+    'No Face': -1
+}
+
 # Camera for web stream (Pi Camera)
 picam2 = Picamera2()
 picam2.configure(
@@ -178,7 +187,8 @@ def on_mqtt_message(client, userdata, msg):
                 },
                 "fields": {
                     "fall_detected": int(payload.get('fall_detected', 0)),
-                    "emotion": payload.get('emotions', 'Unknown')
+                    "emotion": payload.get('emotions', 'Unknown'),
+                    "emotion_code": EMOTION_MAP.get(str(payload.get('emotions', 'Unknown')), -1)
                 },
                 "time": int(time.time() * 1e9)
             }
@@ -197,12 +207,26 @@ def handle_emergency(mqtt_client):
 def emotion_publish_loop(mqtt_client):
     global global_expression
     while True:
-        # Publish current emotion with no fall
-        payload = {"fall_detected": "0", "emotions": global_expression}
+        # Use vision system to analyze scene (may return None on error)
+        fall_flag = '0'
+        try:
+            vres = vision.analyze_scene()
+            if vres and str(vres.get('fall_detected')) == '1':
+                fall_flag = '1'
+        except Exception as e:
+            print(f"[VISION] analyze_scene error: {e}")
+
+        # If vision detects a fall, trigger emergency (same behavior as g-force)
+        if fall_flag == '1':
+            print('[VISION] Fall detected by camera -> triggering emergency protocol')
+            threading.Thread(target=handle_emergency, args=(mqtt_client,)).start()
+
+        # Publish current emotion and fall flag
+        payload = {"fall_detected": fall_flag, "emotions": global_expression}
         mqtt_client.publish(config.TOPIC_CAM, payload)
         print(f"[EMOTION] Published: {payload}")
 
-        # Write to InfluxDB
+        # Write to InfluxDB (store emotion and fall flag)
         json_body = [
             {
                 "measurement": "camera",
@@ -210,13 +234,17 @@ def emotion_publish_loop(mqtt_client):
                     "sensor": "picam"
                 },
                 "fields": {
-                    "fall_detected": 0,
-                    "emotion": global_expression
+                    "fall_detected": 1 if fall_flag == '1' else 0,
+                    "emotion": global_expression,
+                    "emotion_code": EMOTION_MAP.get(global_expression, -1)
                 },
                 "time": int(time.time() * 1e9)
             }
         ]
-        influx_client.write_points(json_body)
+        try:
+            influx_client.write_points(json_body)
+        except Exception as e:
+            print(f"[INFLUX] write error (camera): {e}")
 
         time.sleep(10)  # Publish every 10 seconds
 
@@ -321,7 +349,8 @@ def env_status_api():
         "smoke_status": global_smoke_status,
         "critical_alert": global_critical_alert,
         "g_force_latest": global_latest_g_force,
-        "expression": global_expression
+        "expression": global_expression,
+        "expression_code": EMOTION_MAP.get(global_expression, -1)
     })
 
 @app.route("/dashboard_data")

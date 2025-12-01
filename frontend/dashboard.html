@@ -89,7 +89,14 @@
             // Convert [{time, value}] -> [{ts: Date, label: string, y: number|null}] and filter invalid dates
             const out = [];
             for (const d of (arr || [])) {
-                const dt = new Date(d.time);
+                // Normalize ISO timestamp: truncate fractional seconds to milliseconds if needed
+                let t = d.time;
+                try {
+                    if (typeof t === 'string') {
+                        t = t.replace(/(\.\d{3})\d+Z$/, '$1Z');
+                    }
+                } catch (e) { /* ignore */ }
+                const dt = new Date(t);
                 if (isNaN(dt.getTime())) continue; // skip invalid timestamps
                 const raw = d.value;
                 const y = (typeof raw === 'number') ? raw : (isNaN(Number(raw)) ? null : Number(raw));
@@ -109,7 +116,29 @@
                 const humPoints = toTimePoints(data.hum_data || []);
                 const gForcePoints = toTimePoints(data.g_force_data || []);
                 const fallPoints = (data.fall_data || []).map(d => ({ x: new Date(d.time), y: Number(d.value) }));
-                const emotionPoints = (data.emotion_data || []).map(d => ({ x: new Date(d.time), y: (emotionMap[d.value] !== undefined ? emotionMap[d.value] : -1) }));
+                const emotionPoints = (data.emotion_data || []).map(d => {
+                    // normalize timestamp similar to toTimePoints
+                    let t = d.time;
+                    try {
+                        if (typeof t === 'string') {
+                            t = t.replace(/(\.\d{3})\d+Z$/, '$1Z');
+                        }
+                    } catch (e) { }
+                    const dt = new Date(t);
+                    if (isNaN(dt.getTime())) return null;
+                    const raw = d.value;
+                    let yVal = null;
+                    if (typeof raw === 'number') {
+                        yVal = raw;
+                    } else if (!isNaN(Number(raw))) {
+                        yVal = Number(raw);
+                    } else if (emotionMap[raw] !== undefined) {
+                        yVal = emotionMap[raw];
+                    } else {
+                        yVal = -1;
+                    }
+                    return { ts: dt, label: dt.toLocaleString(), y: (isNaN(Number(yVal)) ? null : Number(yVal)) };
+                }).filter(Boolean);
 
                 const smaWindow = 5;
                 const tempSMA = calculateSMAPoints(tempPoints, smaWindow);

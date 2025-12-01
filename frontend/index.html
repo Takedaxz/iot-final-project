@@ -49,6 +49,7 @@
                             <h3 class="small muted">Motion</h3>
                             <p>G-Force: <strong id="gforce">Loading...</strong></p>
                             <p>Expression: <strong id="expression">Loading...</strong></p>
+                                <p>Expression code: <strong id="expression_code">Loading...</strong></p>
                         </div>
                         <hr style="border:none; border-top:1px solid var(--divider); margin:8px 0">
                         <div>
@@ -76,6 +77,9 @@
                     document.getElementById('smoke').textContent = data.smoke_status;
                     document.getElementById('gforce').textContent = data.g_force_latest;
                     document.getElementById('expression').textContent = data.expression;
+                    if (document.getElementById('expression_code')) {
+                        document.getElementById('expression_code').textContent = data.expression_code ?? 'N/A';
+                    }
                     document.getElementById('alert').textContent = data.critical_alert;
 
                     // Style alerts
