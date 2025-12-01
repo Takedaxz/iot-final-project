@@ -27,7 +27,7 @@ import time
 from influxdb import InfluxDBClient
 
 # Flask app
-app = Flask(__name__)
+app = Flask(__name__, template_folder='../frontend')
 CORS(app)  # Enable CORS for all routes
 
 # MediaPipe
@@ -331,12 +331,14 @@ def dashboard_data():
     hum_result = influx_client.query('SELECT * FROM environment WHERE time > now() - 24h')
     g_force_result = influx_client.query('SELECT * FROM motion WHERE time > now() - 24h')
     fall_result = influx_client.query('SELECT * FROM camera WHERE time > now() - 24h')
+    emotion_result = influx_client.query('SELECT * FROM camera WHERE time > now() - 24h')
 
     # Process data for JSON
     temp_data = []
     hum_data = []
     g_force_data = []
     fall_data = []
+    emotion_data = []
 
     if temp_result:
         for point in temp_result.get_points():
@@ -354,11 +356,16 @@ def dashboard_data():
         for point in fall_result.get_points():
             fall_data.append({"time": point['time'], "value": point.get('fall_detected', 0)})
 
+    if emotion_result:
+        for point in emotion_result.get_points():
+            emotion_data.append({"time": point['time'], "value": point.get('emotion', 'Unknown')})
+
     return jsonify({
         "temp_data": temp_data,
         "hum_data": hum_data,
         "g_force_data": g_force_data,
-        "fall_data": fall_data
+        "fall_data": fall_data,
+        "emotion_data": emotion_data
     })
 
 @app.route("/dashboard")
