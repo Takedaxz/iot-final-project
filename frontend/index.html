@@ -4,47 +4,63 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ElderSafe Camera Stream</title>
-    <script src="config.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f0f0f0; }
-        h1 { color: #333; }
-        .container { display: flex; flex-wrap: wrap; }
-        .video-container { flex: 1; min-width: 640px; }
-        .status-container { flex: 1; min-width: 300px; margin-left: 20px; }
-        .status { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 10px; }
-        .status h3 { margin-top: 0; color: #555; }
-        .alert { color: red; font-weight: bold; }
-        .ok { color: green; }
-        img { max-width: 100%; border: 2px solid #ccc; }
-    </style>
+        <script src="config.js"></script>
+        <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <h1>ElderSafe Live Camera Stream</h1>
-    <a href="/dashboard.html">View Historical Dashboard</a>
-    <div class="container">
-        <div class="video-container">
-            <h2>Live Feed</h2>
-            <img src="" alt="Live Camera Feed">
-            <!-- <img src="http://localhost:5000/video_feed" alt="Live Camera Feed"> -->
-        </div>
-        <div class="status-container">
-            <div class="status">
-                <h3>Environment Status</h3>
-                <p>Temperature: <span id="temp">Loading...</span></p>
-                <p>Humidity: <span id="hum">Loading...</span></p>
-                <p>Smoke: <span id="smoke">Loading...</span></p>
+        <header class="site-header">
+            <div class="inner">
+                <div class="logo">ElderSafe</div>
+                <nav class="nav">
+                    <a href="/">Live</a>
+                    <a href="/dashboard.html" class="active">Dashboard</a>
+                </nav>
+                <div class="small muted">v1.0</div>
             </div>
-            <div class="status">
-                <h3>Motion & Fall Detection</h3>
-                <p>G-Force: <span id="gforce">Loading...</span></p>
-                <p>Expression: <span id="expression">Loading...</span></p>
+        </header>
+
+        <main class="container">
+            <section class="hero">
+                <div>
+                    <h1>ElderSafe Live Camera Stream</h1>
+                    <p class="muted small">Real-time feed and environment status for quick monitoring.</p>
+                </div>
+                <div class="cta">
+                    <button class="btn btn-primary">Connect</button>
+                    <a class="btn btn-secondary" href="/dashboard.html">Historical Dashboard</a>
+                </div>
+            </section>
+
+            <div class="grid">
+                <div class="col-8">
+                    <div class="card">
+                        <h3 class="small muted">Live Feed</h3>
+                        <img src="" alt="Live Camera Feed" style="width:100%; border-radius:8px; margin-top:8px">
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="card status">
+                        <div>
+                            <h3 class="small muted">Environment</h3>
+                            <p>Temperature: <strong id="temp">Loading...</strong></p>
+                            <p>Humidity: <strong id="hum">Loading...</strong></p>
+                            <p>Smoke: <strong id="smoke">Loading...</strong></p>
+                        </div>
+                        <hr style="border:none; border-top:1px solid var(--divider); margin:8px 0">
+                        <div>
+                            <h3 class="small muted">Motion</h3>
+                            <p>G-Force: <strong id="gforce">Loading...</strong></p>
+                            <p>Expression: <strong id="expression">Loading...</strong></p>
+                        </div>
+                        <hr style="border:none; border-top:1px solid var(--divider); margin:8px 0">
+                        <div>
+                            <h3 class="small muted">Alerts</h3>
+                            <p id="alert">Loading...</p>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="status">
-                <h3>Alerts</h3>
-                <p id="alert">Loading...</p>
-            </div>
-        </div>
-    </div>
+        </main>
 
     <script>
         // Set the video feed src dynamically

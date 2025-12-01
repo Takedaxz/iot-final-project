@@ -1,0 +1,85 @@
+:root{
+  --bg: #FAFAFA;
+  --paper: #FFFFFF;
+  --text: #0F0F0F;
+  --muted: #757575;
+  --accent: #00D9FF;
+  --accent-2: #0099FF;
+  --warm: #FF7A59;
+  --divider: #E5E5E5;
+  --success: #2ECC71;
+  --danger: #FF4D4F;
+  --glass: rgba(255,255,255,0.6);
+  --max-width: 1280px;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  background:var(--bg);
+  color:var(--text);
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+
+.site-header{
+  width:100%;
+  background:linear-gradient(180deg, rgba(255,255,255,0.8), rgba(255,255,255,0.6));
+  backdrop-filter: blur(6px);
+  position:sticky;
+  top:0;
+  z-index:40;
+  border-bottom:1px solid var(--divider);
+}
+.site-header .inner{
+  max-width:var(--max-width);
+  margin:0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:12px 20px;
+}
+.logo{font-weight:700; font-size:18px; color:var(--text); letter-spacing:0.2px}
+.nav{display:flex; gap:12px; align-items:center}
+.nav a{color:var(--muted); text-decoration:none; padding:8px 10px; border-radius:6px}
+.nav a.active, .nav a:hover{color:var(--text); box-shadow:inset 0 -2px 0 var(--accent)}
+
+.container{max-width:var(--max-width); margin:28px auto; padding:0 20px}
+.hero{display:flex; gap:24px; align-items:center; justify-content:space-between; padding:40px 0}
+.hero h1{font-size:40px; margin:0; line-height:1.1}
+.hero .cta{display:flex; gap:12px}
+.btn{display:inline-flex; align-items:center; gap:8px; padding:10px 16px; border-radius:10px; cursor:pointer; border:0; font-weight:500}
+.btn-primary{background:var(--accent); color:white}
+.btn-secondary{background:transparent; border:1px solid var(--divider); color:var(--text)}
+
+.grid{display:grid; grid-template-columns:repeat(12,1fr); gap:16px}
+.col-8{grid-column:span 8}
+.col-4{grid-column:span 4}
+
+.card{background:var(--paper); border:1px solid var(--divider); padding:16px; border-radius:10px; box-shadow:0 1px 6px rgba(20,20,20,0.03)}
+.status{display:flex; flex-direction:column; gap:8px}
+.status h3{margin:0; font-size:16px; color:var(--muted)}
+.status p{margin:0; font-size:15px}
+
+canvas{width:100% !important; height:320px !important}
+
+/* Dashboard grid simplification for canvases */
+.charts{display:grid; grid-template-columns:repeat(2, 1fr); gap:18px}
+.charts canvas{height:360px}
+
+/* Mobile */
+@media (max-width:900px){
+  .charts{grid-template-columns:1fr}
+  .hero{flex-direction:column; align-items:flex-start}
+  .col-8{grid-column:span 12}
+  .col-4{grid-column:span 12}
+}
+
+.muted{color:var(--muted)}
+.alert{color:var(--danger); font-weight:600}
+.ok{color:var(--success); font-weight:600}
+
+.small{font-size:13px}

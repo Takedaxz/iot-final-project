@@ -6,15 +6,41 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Use the UMD adapter bundle (v3) which matches Chart.js v4 -->
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.min.js"></script>
-    <script src="config.js"></script>
+        <script src="config.js"></script>
+        <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <h1>ElderSafe Historical Dashboard</h1>
-    <canvas id="tempChart" width="400" height="200"></canvas>
-    <canvas id="humChart" width="400" height="200"></canvas>
-    <canvas id="gForceChart" width="400" height="200"></canvas>
-    <canvas id="fallChart" width="400" height="200"></canvas>
-    <canvas id="emotionChart" width="400" height="200"></canvas>
+        <header class="site-header">
+            <div class="inner">
+                <div class="logo">ElderSafe</div>
+                <nav class="nav">
+                    <a href="/">Live</a>
+                    <a href="/dashboard.html" class="active">Dashboard</a>
+                </nav>
+                <div class="small muted">Historical</div>
+            </div>
+        </header>
+
+        <main class="container">
+            <section class="hero">
+                <div>
+                    <h1>ElderSafe Historical Dashboard</h1>
+                    <p class="muted small">Trends and recent events (last 24 hours)</p>
+                </div>
+                <div class="cta">
+                    <a class="btn btn-secondary" href="/">Live View</a>
+                </div>
+            </section>
+
+            <div class="card">
+                <div class="charts">
+                    <canvas id="tempChart" width="400" height="200"></canvas>
+                    <canvas id="humChart" width="400" height="200"></canvas>
+                    <canvas id="gForceChart" width="400" height="200"></canvas>
+                    <canvas id="fallChart" width="400" height="200"></canvas>
+                    <canvas id="emotionChart" width="400" height="200"></canvas>
+                </div>
+            </div>
 
     <script>
         // Function to calculate Simple Moving Average and return aligned points
