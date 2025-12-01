@@ -44,14 +44,16 @@
         };
 
         function toTimePoints(arr) {
-            // Convert [{time, value}] -> [{x: Date, y: value}] and filter invalid dates
+            // Convert [{time, value}] -> [{ts: Date, label: string, y: number|null}] and filter invalid dates
             const out = [];
             for (const d of (arr || [])) {
                 const dt = new Date(d.time);
                 if (isNaN(dt.getTime())) continue; // skip invalid timestamps
                 const raw = d.value;
                 const y = (typeof raw === 'number') ? raw : (isNaN(Number(raw)) ? null : Number(raw));
-                out.push({ x: dt, y: y });
+                // label formatted for readability
+                const label = dt.toLocaleString();
+                out.push({ ts: dt, label: label, y: y });
             }
             return out;
         }
@@ -73,12 +75,10 @@
                 const gForceSMA = calculateSMAPoints(gForcePoints, smaWindow);
 
                 const commonOptions = {
-                    parsing: { xAxisKey: 'x', yAxisKey: 'y' },
                     plugins: { legend: { position: 'top' } },
                     scales: {
                         x: {
-                            type: 'time',
-                            time: { tooltipFormat: 'PP p', unit: 'hour', displayFormats: { hour: 'dd/MM HH:mm' } },
+                            type: 'category',
                             ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 12 }
                         }
                     },
@@ -86,59 +86,77 @@
                     interaction: { mode: 'nearest', intersect: false }
                 };
 
-                // Temperature
+                // Temperature (use category labels)
+                const tempLabels = tempPoints.map(p => p.label);
+                const tempValues = tempPoints.map(p => p.y);
+                const tempSMAVals = tempSMA.map(p => p.y);
                 new Chart(document.getElementById('tempChart'), {
                     type: 'line',
                     data: {
+                        labels: tempLabels,
                         datasets: [
-                            { label: 'Temperature (°C)', data: tempPoints, borderColor: 'red', backgroundColor: 'rgba(255,0,0,0.05)', fill: false, pointRadius: 2 },
-                            { label: `Temperature SMA (${smaWindow})`, data: tempSMA, borderColor: 'orange', borderDash: [6, 4], pointRadius: 0 }
+                            { label: 'Temperature (°C)', data: tempValues, borderColor: 'red', backgroundColor: 'rgba(255,0,0,0.05)', fill: false, pointRadius: 2 },
+                            { label: `Temperature SMA (${smaWindow})`, data: tempSMAVals, borderColor: 'orange', borderDash: [6, 4], pointRadius: 0 }
                         ]
                     },
                     options: commonOptions
                 });
 
                 // Humidity
+                const humLabels = humPoints.map(p => p.label);
+                const humValues = humPoints.map(p => p.y);
+                const humSMAVals = humSMA.map(p => p.y);
                 new Chart(document.getElementById('humChart'), {
                     type: 'line',
                     data: {
+                        labels: humLabels,
                         datasets: [
-                            { label: 'Humidity (%)', data: humPoints, borderColor: 'blue', backgroundColor: 'rgba(0,0,255,0.05)', fill: false, pointRadius: 2 },
-                            { label: `Humidity SMA (${smaWindow})`, data: humSMA, borderColor: 'cyan', borderDash: [6, 4], pointRadius: 0 }
+                            { label: 'Humidity (%)', data: humValues, borderColor: 'blue', backgroundColor: 'rgba(0,0,255,0.05)', fill: false, pointRadius: 2 },
+                            { label: `Humidity SMA (${smaWindow})`, data: humSMAVals, borderColor: 'cyan', borderDash: [6, 4], pointRadius: 0 }
                         ]
                     },
                     options: commonOptions
                 });
 
                 // G-Force
+                const gLabels = gForcePoints.map(p => p.label);
+                const gValues = gForcePoints.map(p => p.y);
+                const gSMAVals = gForceSMA.map(p => p.y);
                 new Chart(document.getElementById('gForceChart'), {
                     type: 'line',
                     data: {
+                        labels: gLabels,
                         datasets: [
-                            { label: 'G-Force', data: gForcePoints, borderColor: 'green', backgroundColor: 'rgba(0,128,0,0.05)', fill: false, pointRadius: 2 },
-                            { label: `G-Force SMA (${smaWindow})`, data: gForceSMA, borderColor: 'lime', borderDash: [6, 4], pointRadius: 0 }
+                            { label: 'G-Force', data: gValues, borderColor: 'green', backgroundColor: 'rgba(0,128,0,0.05)', fill: false, pointRadius: 2 },
+                            { label: `G-Force SMA (${smaWindow})`, data: gSMAVals, borderColor: 'lime', borderDash: [6, 4], pointRadius: 0 }
                         ]
                     },
                     options: commonOptions
                 });
 
-                // Fall Detection (scatter) - show only points where value > 0
+                // Fall detection - plot as points on same category labels
+                const fallLabels = tempPoints.length ? tempPoints.map(p => p.label) : fallPoints.map(p => p.label || (p.x ? new Date(p.x).toLocaleString() : ''));
+                const fallValues = (tempPoints.length ? tempPoints.map((p, i) => (fallPoints[i] && Number(fallPoints[i].y) > 0 ? 1 : null)) : fallPoints.map(p => (p.y > 0 ? 1 : null)));
                 new Chart(document.getElementById('fallChart'), {
-                    type: 'scatter',
+                    type: 'line',
                     data: {
+                        labels: fallLabels,
                         datasets: [
-                            { label: 'Falls Detected', data: fallPoints.filter(p => p.y > 0), backgroundColor: 'red', pointRadius: 4 }
+                            { label: 'Falls Detected (1=yes)', data: fallValues, borderColor: 'red', pointRadius: 4, showLine: false }
                         ]
                     },
                     options: Object.assign({}, commonOptions, { scales: { x: commonOptions.scales.x, y: { beginAtZero: true, ticks: { stepSize: 1 } } } })
                 });
 
-                // Emotion chart - map numeric back to labels in tooltip
+                // Emotion chart
+                const eLabels = emotionPoints.map(p => p.label);
+                const eValues = emotionPoints.map(p => p.y);
                 new Chart(document.getElementById('emotionChart'), {
                     type: 'line',
                     data: {
+                        labels: eLabels,
                         datasets: [
-                            { label: 'Emotion (0=Neutral,1=Happy,2=Sad,3=Surprised)', data: emotionPoints, borderColor: 'purple', pointRadius: 2 }
+                            { label: 'Emotion (0=Neutral,1=Happy,2=Sad,3=Surprised)', data: eValues, borderColor: 'purple', pointRadius: 2 }
                         ]
                     },
                     options: Object.assign({}, commonOptions, {
