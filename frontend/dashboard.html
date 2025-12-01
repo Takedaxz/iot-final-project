@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <title>ElderSafe Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2"></script>
+    <!-- Use the UMD adapter bundle which includes date-fns to avoid module/exports issues -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2/dist/chartjs-adapter-date-fns.min.js"></script>
     <script src="config.js"></script>
 </head>
 <body>
@@ -65,8 +65,6 @@
                 const gForceSMA = calculateSMAPoints(gForcePoints, smaWindow);
 
                 const commonOptions = {
-                    parsing: false,
-                    normalized: true,
                     plugins: { legend: { position: 'top' } },
                     scales: {
                         x: {
