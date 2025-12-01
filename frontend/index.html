@@ -23,7 +23,7 @@
     <div class="container">
         <div class="video-container">
             <h2>Live Feed</h2>
-            <img src="http://172.20.10.8:5000/video_feed" alt="Live Camera Feed">
+            <img src="https://video.YOURDOMAIN.com/video_feed" alt="Live Camera Feed">
         </div>
         <div class="status-container">
             <div class="status">
@@ -47,7 +47,7 @@
 
     <script>
         function updateStatus() {
-            fetch('http://172.20.10.8:5000/env_status_api')
+            fetch('https://video.YOURDOMAIN.com/env_status_api')
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('temp').textContent = data.temperature;
