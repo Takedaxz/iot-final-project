@@ -23,3 +23,9 @@ MIC_THRESHOLD = 150
 
 # Environment publish interval (seconds)
 ENV_INTERVAL = 5
+
+# InfluxDB Settings
+INFLUXDB_URL = "http://localhost:8086"
+INFLUXDB_TOKEN = ""  # For InfluxDB 1.x, no token needed
+INFLUXDB_ORG = ""  # Not used in 1.x
+INFLUXDB_BUCKET = "eldersafe"  # Database name

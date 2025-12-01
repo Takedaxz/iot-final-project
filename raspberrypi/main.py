@@ -16,14 +16,19 @@ from modules.mqtt_handler import MQTTHandler
 
 # Flask imports
 from flask import Flask, Response, render_template, jsonify
+from flask_cors import CORS
 import cv2
 from picamera2 import Picamera2
 import mediapipe as mp
 import numpy as np
 import time
 
+# InfluxDB imports
+from influxdb import InfluxDBClient
+
 # Flask app
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
 # MediaPipe
 mp_face_mesh = mp.solutions.face_mesh
@@ -50,6 +55,9 @@ time.sleep(0.5)  # Warm-up time
 # Initialize hardware and vision early
 hw = HardwareManager(config)
 vision = VisionSystem(picam2=picam2)
+
+# Initialize InfluxDB client
+influx_client = InfluxDBClient(host='localhost', port=8086, database=config.INFLUXDB_BUCKET)
 
 # --------------------------------------------------
 # FACIAL EXPRESSION DETECTION
@@ -97,7 +105,39 @@ def on_mqtt_message(client, userdata, msg):
         mqtt.publish(config.TOPIC_CLOUD_MOTION, payload)
         print(f"[CLOUD] Forwarded motion: {payload}")
 
+        # Write cloud motion to InfluxDB
+        json_body = [
+            {
+                "measurement": "cloud_motion",
+                "tags": {
+                    "sensor": "esp32"
+                },
+                "fields": {
+                    "g_force": g_val,
+                    "mic": mic_val
+                },
+                "time": int(time.time() * 1e9)
+            }
+        ]
+        influx_client.write_points(json_body)
+
         global_latest_g_force = g_val
+
+        # Write motion to InfluxDB
+        json_body = [
+            {
+                "measurement": "motion",
+                "tags": {
+                    "sensor": "esp32"
+                },
+                "fields": {
+                    "g_force": g_val,
+                    "mic": mic_val
+                },
+                "time": int(time.time() * 1e9)
+            }
+        ]
+        influx_client.write_points(json_body)
 
         if g_val > config.G_FORCE_LIMIT:
             print('[LOGIC] High impact -> trigger vision verification')
@@ -108,6 +148,22 @@ def on_mqtt_message(client, userdata, msg):
                 mqtt.publish(config.TOPIC_CAM, payload)
                 print(f"[FALL] Published confirmed fall: {payload}")
                 global_critical_alert = "FALL DETECTED"
+
+                # Write fall to InfluxDB
+                json_body = [
+                    {
+                        "measurement": "camera",
+                        "tags": {
+                            "sensor": "picam"
+                        },
+                        "fields": {
+                            "fall_detected": 1,
+                            "emotion": global_expression
+                        },
+                        "time": int(time.time() * 1e9)
+                    }
+                ]
+                influx_client.write_points(json_body)
             else:
                 global_critical_alert = "ALERT_OK"
 
@@ -116,6 +172,22 @@ def on_mqtt_message(client, userdata, msg):
             print('[LOGIC] Confirmed fall -> triggering emergency protocol')
             # run emergency in separate thread so env loop continues
             threading.Thread(target=handle_emergency, args=(mqtt,)).start()
+
+        # Write received cam data to InfluxDB
+        json_body = [
+            {
+                "measurement": "camera",
+                "tags": {
+                    "sensor": "picam"
+                },
+                "fields": {
+                    "fall_detected": int(payload.get('fall_detected', 0)),
+                    "emotion": payload.get('emotions', 'Unknown')
+                },
+                "time": int(time.time() * 1e9)
+            }
+        ]
+        influx_client.write_points(json_body)
 
 
 def handle_emergency(mqtt_client):
@@ -133,6 +205,23 @@ def emotion_publish_loop(mqtt_client):
         payload = {"fall_detected": "0", "emotions": global_expression}
         mqtt_client.publish(config.TOPIC_CAM, payload)
         print(f"[EMOTION] Published: {payload}")
+
+        # Write to InfluxDB
+        json_body = [
+            {
+                "measurement": "camera",
+                "tags": {
+                    "sensor": "picam"
+                },
+                "fields": {
+                    "fall_detected": 0,
+                    "emotion": global_expression
+                },
+                "time": int(time.time() * 1e9)
+            }
+        ]
+        influx_client.write_points(json_body)
+
         time.sleep(10)  # Publish every 10 seconds
 
 
@@ -151,6 +240,25 @@ def env_loop(mqtt_client):
         global_humidity = str(env.get('humidity', 'N/A'))
         smoke = env.get('smoke', 0)
         global_smoke_status = "SMOKE_DETECTED" if smoke == 1 else "SMOKE_OK"
+
+        # Write to InfluxDB
+        fields = {"smoke": smoke}
+        if env.get('temp') != "N/A":
+            fields["temperature"] = env.get('temp')
+        if env.get('humidity') != "N/A":
+            fields["humidity"] = env.get('humidity')
+
+        json_body = [
+            {
+                "measurement": "environment",
+                "tags": {
+                    "sensor": "dht"
+                },
+                "fields": fields,
+                "time": int(env['timestamp'] * 1e9)
+            }
+        ]
+        influx_client.write_points(json_body)
 
 
 # --------------------------------------------------
@@ -220,6 +328,75 @@ def env_status_api():
         "expression": global_expression
     })
 
+@app.route("/dashboard_data")
+def dashboard_data():
+    # Query InfluxDB for last 24 hours
+    temp_result = influx_client.query('SELECT * FROM environment WHERE time > now() - 24h')
+    hum_result = influx_client.query('SELECT * FROM environment WHERE time > now() - 24h')
+    g_force_result = influx_client.query('SELECT * FROM motion WHERE time > now() - 24h')
+    fall_result = influx_client.query('SELECT * FROM camera WHERE time > now() - 24h')
+
+    # Process data for JSON
+    temp_data = []
+    hum_data = []
+    g_force_data = []
+    fall_data = []
+
+    if temp_result:
+        for point in temp_result.get_points():
+            temp_data.append({"time": point['time'], "value": point.get('temperature', 0)})
+
+    if hum_result:
+        for point in hum_result.get_points():
+            hum_data.append({"time": point['time'], "value": point.get('humidity', 0)})
+
+    if g_force_result:
+        for point in g_force_result.get_points():
+            g_force_data.append({"time": point['time'], "value": point.get('g_force', 0)})
+
+    if fall_result:
+        for point in fall_result.get_points():
+            fall_data.append({"time": point['time'], "value": point.get('fall_detected', 0)})
+
+    return jsonify({
+        "temp_data": temp_data,
+        "hum_data": hum_data,
+        "g_force_data": g_force_data,
+        "fall_data": fall_data
+    })
+
+@app.route("/dashboard")
+def dashboard():
+    # Query InfluxDB for last 24 hours
+    temp_result = influx_client.query('SELECT * FROM environment WHERE time > now() - 24h')
+    hum_result = influx_client.query('SELECT * FROM environment WHERE time > now() - 24h')
+    g_force_result = influx_client.query('SELECT * FROM motion WHERE time > now() - 24h')
+    fall_result = influx_client.query('SELECT * FROM camera WHERE time > now() - 24h')
+
+    # Process data for charts
+    temp_data = []
+    hum_data = []
+    g_force_data = []
+    fall_data = []
+
+    if temp_result:
+        for point in temp_result.get_points():
+            temp_data.append({"time": point['time'], "value": point['temperature']})
+
+    if hum_result:
+        for point in hum_result.get_points():
+            hum_data.append({"time": point['time'], "value": point['humidity']})
+
+    if g_force_result:
+        for point in g_force_result.get_points():
+            g_force_data.append({"time": point['time'], "value": point['g_force']})
+
+    if fall_result:
+        for point in fall_result.get_points():
+            fall_data.append({"time": point['time'], "value": point['fall_detected']})
+
+    return render_template("dashboard.html", temp_data=temp_data, hum_data=hum_data, g_force_data=g_force_data, fall_data=fall_data)
+
 
 if __name__ == '__main__':
     mqtt = MQTTHandler(config, on_message=on_mqtt_message)
@@ -237,14 +414,9 @@ if __name__ == '__main__':
     emotion_thread = threading.Thread(target=emotion_publish_loop, args=(mqtt,), daemon=True)
     emotion_thread.start()
 
-    # start Flask web server
-    flask_thread = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=5000, debug=False), daemon=True)
-    flask_thread.start()
-
+    # start Flask web server in main thread
     try:
-        # keep main alive
-        while True:
-            time.sleep(1)
+        app.run(host="0.0.0.0", port=5000, debug=False)
     except KeyboardInterrupt:
         print('Shutting down gateway')
         picam2.stop()

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ElderSafe Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>ElderSafe Historical Dashboard</h1>
+    <canvas id="tempChart" width="400" height="200"></canvas>
+    <canvas id="humChart" width="400" height="200"></canvas>
+    <canvas id="gForceChart" width="400" height="200"></canvas>
+    <canvas id="fallChart" width="400" height="200"></canvas>
+
+    <script>
+        async function loadDashboard() {
+            try {
+                const response = await fetch('http://172.20.10.8:5000/dashboard_data');
+                const data = await response.json();
+
+                const tempData = data.temp_data;
+                const humData = data.hum_data;
+                const gForceData = data.g_force_data;
+                const fallData = data.fall_data;
+
+                // Temperature Chart
+                new Chart(document.getElementById('tempChart'), {
+                    type: 'line',
+                    data: {
+                        labels: tempData.map(d => d.time),
+                        datasets: [{
+                            label: 'Temperature (°C)',
+                            data: tempData.map(d => d.value)
+                        }]
+                    }
+                });
+
+                // Humidity Chart
+                new Chart(document.getElementById('humChart'), {
+                    type: 'line',
+                    data: {
+                        labels: humData.map(d => d.time),
+                        datasets: [{
+                            label: 'Humidity (%)',
+                            data: humData.map(d => d.value)
+                        }]
+                    }
+                });
+
+                // G-Force Chart
+                new Chart(document.getElementById('gForceChart'), {
+                    type: 'line',
+                    data: {
+                        labels: gForceData.map(d => d.time),
+                        datasets: [{
+                            label: 'G-Force',
+                            data: gForceData.map(d => d.value)
+                        }]
+                    }
+                });
+
+                // Fall Detection Chart
+                new Chart(document.getElementById('fallChart'), {
+                    type: 'scatter',
+                    data: {
+                        datasets: [{
+                            label: 'Falls Detected',
+                            data: fallData.map(d => ({x: d.time, y: d.value}))
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            x: {type: 'time'}
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        loadDashboard();
+    </script>
+</body>
+</html>
