@@ -24,7 +24,7 @@
     <div class="container">
         <div class="video-container">
             <h2>Live Feed</h2>
-            <img src="${BASE_URL}/video_feed" alt="Live Camera Feed">
+            <img src="" alt="Live Camera Feed">
             <!-- <img src="http://localhost:5000/video_feed" alt="Live Camera Feed"> -->
         </div>
         <div class="status-container">
@@ -47,6 +47,11 @@
     </div>
 
     <script>
+        // Set the video feed src dynamically
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelector('img').src = BASE_URL + '/video_feed';
+        });
+
         function updateStatus() {
             // fetch('https://logic-allocated-chapters-assessed.trycloudflare.com/env_status_api')
             fetch(BASE_URL + '/env_status_api')

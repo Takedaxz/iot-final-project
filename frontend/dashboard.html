@@ -5,6 +5,7 @@
     <title>ElderSafe Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2"></script>
     <script src="config.js"></script>
 </head>
 <body>
@@ -16,18 +17,21 @@
     <canvas id="emotionChart" width="400" height="200"></canvas>
 
     <script>
-        // Function to calculate Simple Moving Average
-        function calculateSMA(data, windowSize) {
-            const sma = [];
-            for (let i = 0; i < data.length; i++) {
+        // Function to calculate Simple Moving Average and return aligned points
+        function calculateSMAPoints(points, windowSize) {
+            // points: [{x: Date, y: number}]
+            const values = points.map(p => (p.y == null ? 0 : p.y));
+            const smaPoints = [];
+            for (let i = 0; i < points.length; i++) {
                 if (i < windowSize - 1) {
-                    sma.push(null); // Not enough data
+                    smaPoints.push({ x: points[i].x, y: null });
                 } else {
-                    const sum = data.slice(i - windowSize + 1, i + 1).reduce((a, b) => a + b, 0);
-                    sma.push(sum / windowSize);
+                    const window = values.slice(i - windowSize + 1, i + 1);
+                    const sum = window.reduce((a, b) => a + b, 0);
+                    smaPoints.push({ x: points[i].x, y: sum / windowSize });
                 }
             }
-            return sma;
+            return smaPoints;
         }
 
         // Map emotions to numbers for charting
@@ -39,108 +43,103 @@
             'No Face': -1
         };
 
+        function toTimePoints(arr) {
+            // Convert [{time, value}] -> [{x: Date, y: value}]
+            return arr.map(d => ({ x: new Date(d.time), y: (typeof d.value === 'number' ? d.value : (isNaN(Number(d.value)) ? null : Number(d.value))) }));
+        }
+
         async function loadDashboard() {
             try {
                 const response = await fetch(BASE_URL + '/dashboard_data');
-                // const response = await fetch('http://localhost:5000/dashboard_data');
                 const data = await response.json();
 
-                const tempData = data.temp_data;
-                const humData = data.hum_data;
-                const gForceData = data.g_force_data;
-                const fallData = data.fall_data;
-                const emotionData = data.emotion_data;
+                const tempPoints = toTimePoints(data.temp_data || []);
+                const humPoints = toTimePoints(data.hum_data || []);
+                const gForcePoints = toTimePoints(data.g_force_data || []);
+                const fallPoints = (data.fall_data || []).map(d => ({ x: new Date(d.time), y: Number(d.value) }));
+                const emotionPoints = (data.emotion_data || []).map(d => ({ x: new Date(d.time), y: (emotionMap[d.value] !== undefined ? emotionMap[d.value] : -1) }));
 
-                // Temperature Chart with SMA
-                const tempValues = tempData.map(d => d.value);
-                const tempSMA = calculateSMA(tempValues, 5);
+                const smaWindow = 5;
+                const tempSMA = calculateSMAPoints(tempPoints, smaWindow);
+                const humSMA = calculateSMAPoints(humPoints, smaWindow);
+                const gForceSMA = calculateSMAPoints(gForcePoints, smaWindow);
+
+                const commonOptions = {
+                    parsing: false,
+                    normalized: true,
+                    plugins: { legend: { position: 'top' } },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: { tooltipFormat: 'PP p', unit: 'hour', displayFormats: { hour: 'dd/MM HH:mm' } },
+                            ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 12 }
+                        }
+                    },
+                    elements: { point: { radius: 0 }, line: { tension: 0.2 } },
+                    interaction: { mode: 'nearest', intersect: false }
+                };
+
+                // Temperature
                 new Chart(document.getElementById('tempChart'), {
                     type: 'line',
                     data: {
-                        labels: tempData.map(d => d.time),
-                        datasets: [{
-                            label: 'Temperature (°C)',
-                            data: tempValues,
-                            borderColor: 'red'
-                        }, {
-                            label: 'Temperature SMA (5)',
-                            data: tempSMA,
-                            borderColor: 'orange',
-                            borderDash: [5, 5]
-                        }]
-                    }
+                        datasets: [
+                            { label: 'Temperature (°C)', data: tempPoints, borderColor: 'red', backgroundColor: 'rgba(255,0,0,0.05)', fill: false, pointRadius: 2 },
+                            { label: `Temperature SMA (${smaWindow})`, data: tempSMA, borderColor: 'orange', borderDash: [6, 4], pointRadius: 0 }
+                        ]
+                    },
+                    options: commonOptions
                 });
 
-                // Humidity Chart with SMA
-                const humValues = humData.map(d => d.value);
-                const humSMA = calculateSMA(humValues, 5);
+                // Humidity
                 new Chart(document.getElementById('humChart'), {
                     type: 'line',
                     data: {
-                        labels: humData.map(d => d.time),
-                        datasets: [{
-                            label: 'Humidity (%)',
-                            data: humValues,
-                            borderColor: 'blue'
-                        }, {
-                            label: 'Humidity SMA (5)',
-                            data: humSMA,
-                            borderColor: 'cyan',
-                            borderDash: [5, 5]
-                        }]
-                    }
+                        datasets: [
+                            { label: 'Humidity (%)', data: humPoints, borderColor: 'blue', backgroundColor: 'rgba(0,0,255,0.05)', fill: false, pointRadius: 2 },
+                            { label: `Humidity SMA (${smaWindow})`, data: humSMA, borderColor: 'cyan', borderDash: [6, 4], pointRadius: 0 }
+                        ]
+                    },
+                    options: commonOptions
                 });
 
-                // G-Force Chart with SMA
-                const gForceValues = gForceData.map(d => d.value);
-                const gForceSMA = calculateSMA(gForceValues, 5);
+                // G-Force
                 new Chart(document.getElementById('gForceChart'), {
                     type: 'line',
                     data: {
-                        labels: gForceData.map(d => d.time),
-                        datasets: [{
-                            label: 'G-Force',
-                            data: gForceValues,
-                            borderColor: 'green'
-                        }, {
-                            label: 'G-Force SMA (5)',
-                            data: gForceSMA,
-                            borderColor: 'lime',
-                            borderDash: [5, 5]
-                        }]
-                    }
+                        datasets: [
+                            { label: 'G-Force', data: gForcePoints, borderColor: 'green', backgroundColor: 'rgba(0,128,0,0.05)', fill: false, pointRadius: 2 },
+                            { label: `G-Force SMA (${smaWindow})`, data: gForceSMA, borderColor: 'lime', borderDash: [6, 4], pointRadius: 0 }
+                        ]
+                    },
+                    options: commonOptions
                 });
 
-                // Fall Detection Chart
+                // Fall Detection (scatter) - show only points where value > 0
                 new Chart(document.getElementById('fallChart'), {
                     type: 'scatter',
                     data: {
-                        datasets: [{
-                            label: 'Falls Detected',
-                            data: fallData.map(d => ({x: d.time, y: d.value})),
-                            backgroundColor: 'red'
-                        }]
+                        datasets: [
+                            { label: 'Falls Detected', data: fallPoints.filter(p => p.y > 0), backgroundColor: 'red', pointRadius: 4 }
+                        ]
                     },
-                    options: {
-                        scales: {
-                            x: {type: 'time'}
-                        }
-                    }
+                    options: Object.assign({}, commonOptions, { scales: { x: commonOptions.scales.x, y: { beginAtZero: true, ticks: { stepSize: 1 } } } })
                 });
 
-                // Emotion Chart
-                const emotionValues = emotionData.map(d => emotionMap[d.value] || -1);
+                // Emotion chart - map numeric back to labels in tooltip
                 new Chart(document.getElementById('emotionChart'), {
                     type: 'line',
                     data: {
-                        labels: emotionData.map(d => d.time),
-                        datasets: [{
-                            label: 'Emotion (0=Neutral, 1=Happy, 2=Sad, 3=Surprised, -1=No Face)',
-                            data: emotionValues,
-                            borderColor: 'purple'
-                        }]
-                    }
+                        datasets: [
+                            { label: 'Emotion (0=Neutral,1=Happy,2=Sad,3=Surprised)', data: emotionPoints, borderColor: 'purple', pointRadius: 2 }
+                        ]
+                    },
+                    options: Object.assign({}, commonOptions, {
+                        scales: { x: commonOptions.scales.x, y: { ticks: { callback: function(v) { const m = {0:'Neutral',1:'Happy',2:'Sad',3:'Surprised', '-1':'No Face'}; return m[v] !== undefined ? m[v] : v; }, stepSize: 1 } } },
+                        plugins: { tooltip: { callbacks: { label: function(context) { const m = {0:'Neutral',1:'Happy',2:'Sad',3:'Surprised', '-1':'No Face'}; return `Emotion: ${m[context.parsed.y] ?? context.parsed.y}`; } } } }
+                    })
                 });
+
             } catch (error) {
                 console.error('Error loading dashboard:', error);
             }

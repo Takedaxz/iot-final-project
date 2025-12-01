@@ -28,7 +28,7 @@ from influxdb import InfluxDBClient
 
 # Flask app
 app = Flask(__name__, template_folder='../frontend')
-CORS(app)  # Enable CORS for all routes
+CORS(app, origins=["https://iot-final-project-wine.vercel.app", "http://localhost:5000"])
 
 # MediaPipe
 mp_face_mesh = mp.solutions.face_mesh
