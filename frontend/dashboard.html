@@ -45,6 +45,10 @@
                     <canvas id="gForceChart" width="400" height="200"></canvas>
                 </div>
                 <div class="chart-card">
+                    <h4 class="chart-title">Mic (sound level)</h4>
+                    <canvas id="micChart" width="400" height="200"></canvas>
+                </div>
+                <div class="chart-card">
                     <h4 class="chart-title">Falls</h4>
                     <canvas id="fallChart" width="400" height="200"></canvas>
                 </div>
@@ -178,6 +182,21 @@
                         datasets: [
                             { label: 'G-Force', data: gValues, borderColor: 'green', backgroundColor: 'rgba(0,128,0,0.05)', fill: false, pointRadius: 2 },
                             
+                        ]
+                    },
+                    options: commonOptions
+                });
+
+                // Mic (sound level)
+                const micPoints = toTimePoints(data.mic_data || []);
+                const micLabels = micPoints.map(p => p.label);
+                const micValues = micPoints.map(p => p.y);
+                new Chart(document.getElementById('micChart'), {
+                    type: 'line',
+                    data: {
+                        labels: micLabels,
+                        datasets: [
+                            { label: 'Mic (raw ADC)', data: micValues, borderColor: 'orange', backgroundColor: 'rgba(255,165,0,0.05)', fill: false, pointRadius: 2 }
                         ]
                     },
                     options: commonOptions

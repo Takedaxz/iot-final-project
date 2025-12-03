@@ -52,6 +52,7 @@ class VisionSystem:
 
             # Basic heuristic: if face found and bounding box aspect ratio suggests lying
             fall_flag = False
+            confidence = 0.0
 
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             faces = []
@@ -61,17 +62,27 @@ class VisionSystem:
             except Exception:
                 faces = []
 
-            # If no faces or wide bounding box, guess fall
+            # If no faces -> weaker signal (no face might mean occlusion or turned away)
             if len(faces) == 0:
                 fall_flag = True
+                # moderate confidence when no face is detected (heuristic)
+                confidence = 0.6
             else:
                 # choose first face and inspect width/height
                 (x, y, w, h) = faces[0]
                 ratio = w / float(h) if h != 0 else 0
+                # map ratio to confidence: ratio <=1.0 -> 0, ratio >=1.3 -> ~0.95
+                if ratio <= 1.0:
+                    confidence = 0.0
+                else:
+                    # linear map from 1.0..1.3 -> 0..0.95
+                    confidence = min(0.95, max(0.0, (ratio - 1.0) / (1.3 - 1.0) * 0.95))
                 if ratio > 1.2:  # wider than tall -> possibly lying
                     fall_flag = True
 
-            return {"fall_detected": "1" if fall_flag else "0"}
+            return {"fall_detected": "1" if fall_flag else "0", "confidence": float(round(confidence, 2))}
 
-        # Fallback mocked result
-        return {"fall_detected": random.choice(["0", "1"])}
+        # Fallback mocked result (include a mock confidence)
+        mock_flag = random.choice(["0", "1"])
+        mock_conf = round(random.uniform(0.0, 1.0), 2)
+        return {"fall_detected": mock_flag, "confidence": float(mock_conf)}

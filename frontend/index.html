@@ -48,6 +48,7 @@
                         <div>
                             <h3 class="small muted">Motion</h3>
                             <p>G-Force: <strong id="gforce">Loading...</strong></p>
+                            <p>Mic: <strong id="mic">Loading...</strong></p>
                             <p>Expression: <strong id="expression">Loading...</strong></p>
                                 <p>Expression code: <strong id="expression_code">Loading...</strong></p>
                         </div>
@@ -76,6 +77,7 @@
                     document.getElementById('hum').textContent = data.humidity;
                     document.getElementById('smoke').textContent = data.smoke_status;
                     document.getElementById('gforce').textContent = data.g_force_latest;
+                    if (document.getElementById('mic')) document.getElementById('mic').textContent = data.mic_latest ?? 'N/A';
                     document.getElementById('expression').textContent = data.expression;
                     if (document.getElementById('expression_code')) {
                         document.getElementById('expression_code').textContent = data.expression_code ?? 'N/A';

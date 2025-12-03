@@ -20,8 +20,13 @@ PIN_LED=16
 SMOKE_ADC_CHANNEL = 0  # ADS1115 channel for smoke sensor (AO pin)
 
 # Thresholds
-G_FORCE_LIMIT = 2
+G_FORCE_LIMIT = 1.8
 MIC_THRESHOLD = 150
+
+# Camera fall detection confidence threshold (0.0 - 1.0)
+# Vision must return a confidence score in this range. Camera-triggered
+# emergencies will only fire when the returned confidence >= this value.
+CAM_FALL_CONF_THRESHOLD = 0.6
 
 # Environment publish interval (seconds)
 ENV_INTERVAL = 5

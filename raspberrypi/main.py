@@ -41,6 +41,7 @@ global_humidity = "N/A"
 global_smoke_status = "SMOKE_OK"
 global_critical_alert = "ALERT_OK"
 global_latest_g_force = 0.0
+global_latest_mic = 0.0
 global_camera_fall_detected = False
 
 # Emotion mapping (string -> numeric code)
@@ -132,6 +133,8 @@ def on_mqtt_message(client, userdata, msg):
         influx_client.write_points(json_body)
 
         global_latest_g_force = g_val
+        global global_latest_mic
+        global_latest_mic = mic_val
 
         # Write motion to InfluxDB
         json_body = [
@@ -174,23 +177,45 @@ def on_mqtt_message(client, userdata, msg):
             global_critical_alert = "ALERT_OK"
 
     elif topic == config.TOPIC_CAM and payload:
-        if str(payload.get('fall_detected')) == '1':
+        # If publisher included a confidence score, require it to exceed threshold
+        fall_val = int(payload.get('fall_detected', 0))
+        conf_raw = payload.get('confidence', payload.get('camera_confidence', payload.get('cam_confidence', None)))
+        conf = None
+        try:
+            if conf_raw is not None:
+                conf = float(conf_raw)
+        except Exception:
+            conf = None
+
+        trigger = False
+        if fall_val == 1:
+            # If no confidence supplied, preserve existing behavior and trigger.
+            if conf is None:
+                trigger = True
+            else:
+                trigger = (conf >= config.CAM_FALL_CONF_THRESHOLD)
+
+        if trigger:
             print('[LOGIC] Confirmed fall -> triggering emergency protocol')
             # run emergency in separate thread so env loop continues
             threading.Thread(target=handle_emergency, args=(mqtt,)).start()
 
-        # Write received cam data to InfluxDB
+        # Write received cam data to InfluxDB (store camera confidence when provided)
+        json_fields = {
+            "fall_detected": fall_val,
+            "emotion": payload.get('emotions', 'Unknown'),
+            "emotion_code": EMOTION_MAP.get(str(payload.get('emotions', 'Unknown')), -1)
+        }
+        if conf is not None:
+            json_fields["camera_confidence"] = conf
+
         json_body = [
             {
                 "measurement": "camera",
                 "tags": {
                     "sensor": "picam"
                 },
-                "fields": {
-                    "fall_detected": int(payload.get('fall_detected', 0)),
-                    "emotion": payload.get('emotions', 'Unknown'),
-                    "emotion_code": EMOTION_MAP.get(str(payload.get('emotions', 'Unknown')), -1)
-                },
+                "fields": json_fields,
                 "time": int(time.time() * 1e9)
             }
         ]
@@ -211,28 +236,36 @@ def emotion_publish_loop(mqtt_client):
     while True:
         # Use vision system to analyze scene (may return None on error)
         fall_flag = '0'
+        camera_conf = 0.0
         try:
             vres = vision.analyze_scene()
-            if vres and str(vres.get('fall_detected')) == '1':
-                fall_flag = '1'
+            if vres:
+                # vision now returns a confidence score (0.0-1.0)
+                try:
+                    camera_conf = float(vres.get('confidence', 0.0))
+                except Exception:
+                    camera_conf = 0.0
+                # Only treat as fall if confidence meets threshold
+                if str(vres.get('fall_detected')) == '1' and camera_conf >= config.CAM_FALL_CONF_THRESHOLD:
+                    fall_flag = '1'
         except Exception as e:
             print(f"[VISION] analyze_scene error: {e}")
 
-        # If vision detects a fall, trigger emergency (same behavior as g-force)
+        # If vision detects a fall (with sufficient confidence), trigger emergency
         if fall_flag == '1':
-            print('[VISION] Fall detected by camera -> triggering emergency protocol')
+            print('[VISION] Fall detected by camera (conf={}) -> triggering emergency protocol'.format(camera_conf))
             # update global for overlay
             global_camera_fall_detected = True
             threading.Thread(target=handle_emergency, args=(mqtt_client,)).start()
         else:
             global_camera_fall_detected = False
 
-        # Publish current emotion and fall flag
-        payload = {"fall_detected": fall_flag, "emotions": global_expression}
+        # Publish current emotion and fall flag (include confidence)
+        payload = {"fall_detected": fall_flag, "emotions": global_expression, "confidence": round(camera_conf, 2)}
         mqtt_client.publish(config.TOPIC_CAM, payload)
         print(f"[EMOTION] Published: {payload}")
 
-        # Write to InfluxDB (store emotion and fall flag)
+        # Write to InfluxDB (store emotion, fall flag and camera confidence)
         json_body = [
             {
                 "measurement": "camera",
@@ -242,7 +275,8 @@ def emotion_publish_loop(mqtt_client):
                 "fields": {
                     "fall_detected": 1 if fall_flag == '1' else 0,
                     "emotion": global_expression,
-                    "emotion_code": EMOTION_MAP.get(global_expression, -1)
+                    "emotion_code": EMOTION_MAP.get(global_expression, -1),
+                    "camera_confidence": float(round(camera_conf, 2))
                 },
                 "time": int(time.time() * 1e9)
             }
@@ -354,6 +388,8 @@ def env_status_api():
     global global_smoke_status, global_critical_alert
     global global_latest_g_force, global_expression
 
+    global global_latest_mic
+
     return jsonify({
         "temperature": global_temperature,
         "humidity": global_humidity,
@@ -361,6 +397,7 @@ def env_status_api():
         "smoke_status": global_smoke_status,
         "critical_alert": global_critical_alert,
         "g_force_latest": global_latest_g_force,
+        "mic_latest": global_latest_mic,
         "expression": global_expression,
         "expression_code": EMOTION_MAP.get(global_expression, -1)
     })
@@ -378,6 +415,7 @@ def dashboard_data():
     temp_data = []
     hum_data = []
     g_force_data = []
+    mic_data = []
     fall_data = []
     emotion_data = []
 
@@ -392,6 +430,8 @@ def dashboard_data():
     if g_force_result:
         for point in g_force_result.get_points():
             g_force_data.append({"time": point['time'], "value": point.get('g_force', 0)})
+            # motion measurement stores mic value as well
+            mic_data.append({"time": point['time'], "value": point.get('mic', 0)})
 
     if fall_result:
         for point in fall_result.get_points():
@@ -420,6 +460,7 @@ def dashboard_data():
         "temp_data": temp_data,
         "hum_data": hum_data,
         "g_force_data": g_force_data,
+        "mic_data": mic_data,
         "fall_data": fall_data,
         "emotion_data": emotion_data
     })
