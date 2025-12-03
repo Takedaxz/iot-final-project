@@ -43,6 +43,7 @@ global_critical_alert = "ALERT_OK"
 global_latest_g_force = 0.0
 global_latest_mic = 0.0
 global_camera_fall_detected = False
+global_camera_confidence = 0.0
 
 # Emotion mapping (string -> numeric code)
 EMOTION_MAP = {
@@ -199,6 +200,9 @@ def on_mqtt_message(client, userdata, msg):
             print('[LOGIC] Confirmed fall -> triggering emergency protocol')
             # run emergency in separate thread so env loop continues
             threading.Thread(target=handle_emergency, args=(mqtt,)).start()
+        # log camera confidence when present for realtime debugging
+        if conf is not None:
+            print(f"[VISION_CONF][MQTT] Received camera confidence: {conf}")
 
         # Write received cam data to InfluxDB (store camera confidence when provided)
         json_fields = {
@@ -233,6 +237,7 @@ def handle_emergency(mqtt_client):
 def emotion_publish_loop(mqtt_client):
     global global_expression
     global global_camera_fall_detected
+    global global_camera_confidence
     while True:
         # Use vision system to analyze scene (may return None on error)
         fall_flag = '0'
@@ -260,8 +265,12 @@ def emotion_publish_loop(mqtt_client):
         else:
             global_camera_fall_detected = False
 
+        # update global confidence for overlay/API and log it
+        global_camera_confidence = float(round(camera_conf, 2))
+        print(f"[VISION_CONF] camera_confidence={global_camera_confidence}")
+
         # Publish current emotion and fall flag (include confidence)
-        payload = {"fall_detected": fall_flag, "emotions": global_expression, "confidence": round(camera_conf, 2)}
+        payload = {"fall_detected": fall_flag, "emotions": global_expression, "confidence": global_camera_confidence}
         mqtt_client.publish(config.TOPIC_CAM, payload)
         print(f"[EMOTION] Published: {payload}")
 
@@ -363,6 +372,13 @@ def generate_frames():
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
             cv2.putText(frame, f"Status: {fall_state}", (10, 60),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255) if fall_state=="FALL" else (0,255,0), 2)
+            # overlay realtime camera confidence (percentage)
+            try:
+                conf_pct = int(global_camera_confidence * 100)
+            except Exception:
+                conf_pct = 0
+            cv2.putText(frame, f"Conf: {conf_pct}%", (10, 90),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 200, 200), 2)
 
             ret, buf = cv2.imencode(".jpg", frame)
             if not ret: continue
@@ -389,6 +405,7 @@ def env_status_api():
     global global_latest_g_force, global_expression
 
     global global_latest_mic
+    global global_camera_confidence
 
     return jsonify({
         "temperature": global_temperature,
@@ -398,6 +415,7 @@ def env_status_api():
         "critical_alert": global_critical_alert,
         "g_force_latest": global_latest_g_force,
         "mic_latest": global_latest_mic,
+        "camera_confidence": global_camera_confidence,
         "expression": global_expression,
         "expression_code": EMOTION_MAP.get(global_expression, -1)
     })
